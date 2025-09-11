@@ -11,7 +11,7 @@ const convertCamelObjectToSnake = (payload) => {
   const objectKeys = Object.keys(obj);
 
   objectKeys.map((key) => {
-    const convertedKey = convertCamelToSnake(key); // Correct function
+    const convertedKey = convertCamelToSnake(key);
 
     response[convertedKey] = obj[key];
 
@@ -169,5 +169,6 @@ module.exports = {
   generateOTP,
   convertSnakeToCamel,
   camelToSnake,
+  convertCamelObjectToSnake,
 
 };
