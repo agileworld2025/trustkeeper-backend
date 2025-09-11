@@ -19,4 +19,3 @@ module.exports = {
   //  SCHEMA LEVEL/ FIELD  ERROR
   400: '400',
 };
-

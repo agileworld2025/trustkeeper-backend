@@ -2,6 +2,7 @@
 const moment = require('moment');
 const { v1: uuidV1 } = require('uuid');
 const twoFactor = require('node-2fa');
+const { Op } = require('sequelize');
 const {
   user: UserModel, otp: OTPModel, sequelize, user_relation: UserRelationModel,
 } = require('../database');
@@ -13,6 +14,23 @@ const {
 const { camelToSnake } = require('../utils/helper');
 const authentication = require('./authentication');
 const ErrorCode = require('../utils/error');
+
+// 🔹 Utility function to clean up expired OTPs
+const cleanupExpiredOtps = async (email, type, transaction = null) => {
+  const whereClause = {
+    email,
+    type,
+    created_at: {
+      [Op.lt]: moment().utc().subtract(30, 'seconds').toDate(),
+    },
+  };
+
+  if (transaction) {
+    return OTPModel.destroy({ where: whereClause, transaction });
+  }
+
+  return OTPModel.destroy({ where: whereClause });
+};
 
 const register = async (payload) => {
   const {
@@ -63,6 +81,9 @@ const register = async (payload) => {
     const publicId = uuidV1();
 
     const type = OTP_TYPE.USER_REGISTRAION;
+
+    // 🔹 Clean up expired OTPs first
+    await cleanupExpiredOtps(email, OTP_TYPE.USER_REGISTRAION, transaction);
 
     const otpResponse = await OTPModel.findOne({
       attributes: [ 'id', 'otp', 'created_at', 'validity' ],
@@ -534,13 +555,22 @@ const setPassword = async (payload) => {
 
     const response = await UserModel.findOne({
       where,
-      attributes: [ [ 'public_id', 'user_id' ], 'user_relation_id', 'user_type' ],
+      attributes: [ [ 'public_id', 'user_id' ], 'user_relation_id', 'user_type', 'is_email_verified' ],
     });
 
     if (response) {
       const doc = Helper.convertSnakeToCamel(response.dataValues);
 
-      const { userId, userRelationId, userType } = doc;
+      const {
+        userId, userRelationId, userType, isEmailVerified,
+      } = doc;
+
+      // Only allow password setting for verified users (initial setup)
+      if (!isEmailVerified) {
+        return {
+          errors: [ { name: 'email', message: 'Email must be verified before setting password' } ],
+        };
+      }
 
       const salt = authentication.makeSalt();
 
@@ -825,12 +855,143 @@ const verifyMFA = async (payload) => {
 const forgotPassword = async (payload) => {
   const { email } = payload;
 
-  // Validate email is provided
   if (!email) {
     return {
+      errors: [ { name: 'email', message: 'Email is required' } ],
+    };
+  }
+
+  const transaction = await sequelize.transaction();
+
+  try {
+    const response = await UserModel.findOne({
+      where: { email, user_type: USER_TYPE.CUSTOMER },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+      attributes: [ 'email', 'status', [ 'public_id', 'user_id' ] ],
+    });
+
+    if (!response) {
+      await transaction.rollback();
+
+      return { errors: [ { name: 'email', message: 'Email not found or user is not registered' } ] };
+    }
+
+    const dataValues = Helper.convertSnakeToCamel(response.dataValues);
+    const { status } = dataValues;
+
+    if (status.toLowerCase() !== USER_STATUS.ACTIVE.toLowerCase()) {
+      await transaction.rollback();
+
+      return { errors: [ { name: 'user', message: 'user is not in active state.' } ] };
+    }
+
+    // 🔹 Clean up expired OTPs first
+    await cleanupExpiredOtps(email, OTP_TYPE.PASSWORD_RESET, transaction);
+
+    // 🔹 Check rate limit BEFORE creating OTP
+    const recentOtp = await OTPModel.findOne({
+      where: { email, type: OTP_TYPE.PASSWORD_RESET },
+      order: [ [ 'created_at', 'desc' ] ],
+      transaction,
+    });
+
+    if (recentOtp) {
+      const { created_at: createdAt } = recentOtp.dataValues;
+      const timeDiff = moment().utc().diff(moment(createdAt), 'seconds');
+
+      if (timeDiff < 30) {
+        await transaction.rollback();
+
+        return {
+          errors: [
+            {
+              name: 'email',
+              message: `The OTP request limit was exceeded. Please wait for ${30 - timeDiff} more seconds before requesting another OTP`,
+              messages: {
+                en: `The OTP request limit was exceeded. Please wait for ${30 - timeDiff} more seconds before requesting another OTP!`,
+                sw: `Kikomo cha ombi la OTP kilipitwa. Tafadhali subiri kwa sekunde ${30 - timeDiff} zaidi kabla ya kuomba OTP nyingine!`,
+              },
+            },
+          ],
+        };
+      }
+
+      // If time limit has passed, delete the old OTP before creating new one
+      await OTPModel.destroy({
+        where: { email, type: OTP_TYPE.PASSWORD_RESET },
+        transaction,
+      });
+    }
+
+    // 🔹 Only now generate OTP
+    const { otp, validity, currentDate } = Helper.generateOTP();
+    const publicId = uuidV1();
+    const type = OTP_TYPE.PASSWORD_RESET;
+
+    const doc = camelToSnake({
+      type, email, otp, validity, publicId,
+    });
+
+    await OTPModel.create(doc, { transaction });
+
+    const mailResponse = await OtpService.send({
+      email,
+      type,
+      otp,
+      validity,
+      currentDate,
+      referenceId: publicId,
+      mailType: 'otp',
+    });
+
+    if (!mailResponse || mailResponse.error) {
+      await OTPModel.destroy({ where: { public_id: publicId }, transaction });
+      await transaction.rollback();
+
+      return {
+        errors: [ { name: 'mail_service', message: (mailResponse && mailResponse.message) || 'mail service is down' } ],
+      };
+    }
+
+    await transaction.commit();
+
+    return { doc: { message: 'Password reset OTP sent to your email address.' } };
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
+const resetPasswordWithOtp = async (payload) => {
+  const {
+    email, otp, password, confirmPassword,
+  } = payload;
+
+  // Validate password confirmation
+  if (password !== confirmPassword) {
+    return {
       errors: [ {
-        name: 'email',
-        message: 'Email is required',
+        name: 'confirmPassword',
+        message: 'Password and confirm password do not match',
+        messages: {
+          en: 'Password and confirm password do not match',
+          sw: 'Nenosiri na kuthibitisha nenosiri hazifanani',
+        },
+      } ],
+    };
+  }
+
+  // Validate password strength
+  if (password.length < 8) {
+    return {
+      errors: [ {
+        name: 'password',
+        message: 'Password must be at least 8 characters long',
+        messages: {
+          en: 'Password must be at least 8 characters long',
+          sw: 'Nenosiri lazima liwe na angalau herufi 8',
+        },
       } ],
     };
   }
@@ -855,31 +1016,82 @@ const forgotPassword = async (payload) => {
         return { errors: [ { name: 'user', message: 'user is not in active state.' } ] };
       }
 
-      const salt = authentication.makeSalt();
-      const password = Helper.generatePassword();
-      const hashedPassword = authentication.encryptPassword(password, salt);
+      // Verify OTP
+      const otpResponse = await OTPModel.findOne({
+        where: { email, type: OTP_TYPE.PASSWORD_RESET },
+        attributes: [ 'id', 'otp', 'validity' ],
+        order: [ [ 'id', 'desc' ] ],
+        transaction,
+      });
 
-      // Only update the necessary fields for password reset
-      const updateDoc = {
-        salt,
-        hashed_password: hashedPassword,
-        system_generated_password: false,
-        concurrency_stamp: uuidV1(),
-      };
+      if (otpResponse) {
+        const { otp: otpFromDb, validity, id } = otpResponse;
 
-      await UserModel.update(updateDoc, { where: { public_id: userId }, transaction });
+        if (otpFromDb !== otp) {
+          await transaction.rollback();
 
-      const mailResponse = await OtpService.send({ email, password, mailType: 'password' });
+          return {
+            errors: [ {
+              message: 'Please enter the correct OTP, or use Resend OTP! ',
+              messages: {
+                en: 'Please enter the correct OTP, or use Resend OTP! ',
+                sw: 'Tafadhali ingiza OTP sahihi, au tumia Tuma Upya OTP!',
+              },
+              name: 'otp',
+            } ],
+          };
+        }
 
-      if (mailResponse && mailResponse.doc && !mailResponse.error) {
+        if (moment().utc().diff(moment(validity), 'seconds') >= 0) {
+          await transaction.rollback();
+
+          return {
+            errors: [ {
+              message: 'OTP has been expired.',
+              messages: {
+                en: 'The OTP has expired.',
+                sw: 'Muda wa OTP umekwisha.',
+              },
+              name: 'otp',
+            } ],
+          };
+        }
+
+        // Hash the new password
+        const salt = authentication.makeSalt();
+        const hashedPassword = authentication.encryptPassword(password, salt);
+
+        // Update password and invalidate OTP
+        await UserModel.update({
+          salt,
+          hashed_password: hashedPassword,
+          system_generated_password: false,
+          concurrency_stamp: uuidV1(),
+        }, { where: { public_id: userId }, transaction });
+
+        await OTPModel.update({ validity: Date.now() }, { where: { id }, transaction });
+
         await transaction.commit();
 
-        return { doc: { message: 'Password reset email sent successfully.' } };
+        return {
+          doc: {
+            message: 'Password reset successfully! You can now login with your new password.',
+          },
+        };
       }
 
       await transaction.rollback();
 
-      return { errors: [ { name: 'mail_service', message: (mailResponse && mailResponse.message) || 'mail service is down' } ] };
+      return {
+        errors: [ {
+          name: 'otp',
+          message: 'Please enter the correct OTP!',
+          messages: {
+            en: 'Please enter the correct OTP!',
+            sw: 'Tafadhali weka OTP sahihi!',
+          },
+        } ],
+      };
     }
 
     await transaction.rollback();
@@ -893,7 +1105,7 @@ const forgotPassword = async (payload) => {
   } catch (error) {
     await transaction.rollback();
     // eslint-disable-next-line no-console
-    console.error('Forgot password error:', error);
+    console.error('Reset password error:', error);
     throw error;
   }
 };
@@ -922,8 +1134,10 @@ module.exports = {
   createMFA,
   verifyMFA,
   forgotPassword,
+  resetPasswordWithOtp,
   registerRelative,
   getRelatives,
   patchRelative,
   getUserDetails,
+  cleanupExpiredOtps,
 };

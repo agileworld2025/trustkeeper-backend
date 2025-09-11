@@ -10,6 +10,7 @@ module.exports = {
     USER_REGISTRAION: 'USER_REGISTRAION',
     E_SIGNED_REQUESTED: 'E_SIGNED_REQUESTED',
     USER_EMAIL_REQUEST: 'USER_EMAIL_REQUEST',
+    PASSWORD_RESET: 'PASSWORD_RESET',
   },
 
   LOGIN_TYPE: {
@@ -26,7 +27,7 @@ module.exports = {
     RELATIVE: 'RELATIVE',
   },
 
-  CUSTOMER_IGNORE_PATH: [ '/api/register', '/api/verification', '/api/set-password', '/api/login', '/api/forget-password', '/api/uploads' ],
+  CUSTOMER_IGNORE_PATH: [ '/api/register', '/api/verification', '/api/set-password', '/api/login', '/api/forget-password', '/api/reset-password', '/api/uploads' ],
 
   AUDIENCE_TYPE: {
     PLATFORM: 'PLATFORM',

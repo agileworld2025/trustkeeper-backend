@@ -2,7 +2,7 @@ const authService = require('../service/auth');
 const Validator = require('../utils/validator');
 const {
   register: registerSchema, verification: verificationSchema, setPassword: setPasswordSchema, login: loginSchema, forgotPassword: forgotPasswordSchema,
-  registerRelative: registerRelativeSchema, patchRelative: patchRelativeSchema,
+  resetPasswordOtp: resetPasswordOtpSchema, registerRelative: registerRelativeSchema, patchRelative: patchRelativeSchema,
 } = require('../dto-schemas/auth');
 
 const register = async (req, res) => {
@@ -265,6 +265,39 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+const resetPasswordWithOtp = async (req, res) => {
+  try {
+    const { body } = req;
+
+    const data = { ...body };
+
+    const { errors } = Validator.isSchemaValid({ data, schema: resetPasswordOtpSchema });
+
+    if (errors) {
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
+    }
+
+    const { errors: err, doc } = await authService.resetPasswordWithOtp(data);
+
+    if (doc) {
+      res.setHeader('message', 'Password reset successfully!');
+
+      return res.status(200).json(doc);
+    }
+
+    return res.status(400).json({ status: 'error', message: 'Request failed', errors: err });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Reset password controller error:', error);
+
+    return res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
 const getUserDetails = async (req, res) => {
   try {
     const { auth: { userId } } = req;
@@ -289,6 +322,7 @@ module.exports = {
   createMFA,
   verifyMFA,
   forgotPassword,
+  resetPasswordWithOtp,
   registerRelative,
   patchRelative,
   getRelatives,

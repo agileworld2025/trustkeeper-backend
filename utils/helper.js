@@ -23,7 +23,7 @@ const convertCamelObjectToSnake = (payload) => {
 
 function camelToSnake(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
-  
+
   // Handle Date objects
   if (obj instanceof Date) return obj;
 
@@ -142,7 +142,7 @@ const generateOTP = () => {
   });
 
   const now = new Date();
-  const validity = moment(now).add(15, 'minutes').toDate(); // Convert to JavaScript Date
+  const validity = moment(now).add(15, 'minutes').toDate();
   const validityInMinutes = 15;
   const currentDate = moment().utcOffset('+03:00').format('YYYY-MM-DD HH:mm:ss');
 
