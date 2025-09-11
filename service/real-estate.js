@@ -47,7 +47,6 @@ const getAll = async (payload) => {
   const docs = response.map((element) => {
     const record = Helper.convertSnakeToCamel(element.dataValues);
 
-    // Remove encryptedId field and return raw data
     delete record.encryptedId;
 
     return record;
