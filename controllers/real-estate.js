@@ -2,7 +2,7 @@
 const path = require('path');
 const RealEstateService = require('../service/real-estate');
 const Validator = require('../utils/validator');
-const { save: saveSchema, patch: patchSchema, deleted: deletedSchema } = require('../dto-schemas/bank');
+const { patch: patchSchema, deleted: deletedSchema } = require('../dto-schemas/bank');
 
 const save = async (req, res) => {
   try {
@@ -52,6 +52,7 @@ const getAll = async (req, res) => {
     const transformedData = doc.map((item) => {
       // Handle image URL transformation if image exists
       if (item.image) {
+        // eslint-disable-next-line no-param-reassign
         item.image = `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(item.image)}`;
       }
 
@@ -63,7 +64,7 @@ const getAll = async (req, res) => {
         isDeleted: item.isDeleted,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
-        ...item, // Include all other fields directly
+        ...item,
       };
     });
 

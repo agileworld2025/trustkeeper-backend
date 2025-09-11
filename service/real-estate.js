@@ -8,15 +8,12 @@ const { camelToSnake } = require('../utils/helper');
 
 const save = async (data) => {
   try {
-    const { doc, errors: encryptionErrors } = await encryptData(data);
+    const { errors: encryptionErrors } = await encryptData(data);
     const convertedData = camelToSnake(data);
 
     if (encryptionErrors) {
       return { errors: encryptionErrors };
     }
-
-    const { encryptDoc } = doc;
-
     const publicId = uuidV1();
 
     await RealEstateModel.create({
@@ -49,10 +46,10 @@ const getAll = async (payload) => {
 
   const docs = response.map((element) => {
     const record = Helper.convertSnakeToCamel(element.dataValues);
-    
+
     // Remove encryptedId field and return raw data
     delete record.encryptedId;
-    
+
     return record;
   });
 
