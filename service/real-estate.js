@@ -2,7 +2,6 @@
 const { v1: uuidV1 } = require('uuid');
 const { real_estate_records: RealEstateModel, sequelize } = require('../database');
 const Helper = require('../utils/helper');
-
 const { encryptData, decryptData } = require('../utils/senitize-data');
 const { camelToSnake } = require('../utils/helper');
 
