@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 const { v1: uuidV1 } = require('uuid');
-const { real_estate_records: RealEstateModel, sequelize } = require('../database');
+const { vehicle: VehicleModel, sequelize } = require('../database');
 const Helper = require('../utils/helper');
 const { encryptData } = require('../utils/senitize-data');
 const { camelToSnake } = require('../utils/helper');
@@ -15,7 +15,7 @@ const save = async (data) => {
     }
     const publicId = uuidV1();
 
-    await RealEstateModel.create({
+    await VehicleModel.create({
       public_id: publicId,
       ...convertedData,
       user_id: convertedData.user_id,
@@ -27,14 +27,14 @@ const save = async (data) => {
   } catch (error) {
     console.error('Save error:', error.message);
 
-    return { errors: [ { name: 'save', message: 'An error occurred while saving the real estate data' } ] };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving the vehicle data' } ] };
   }
 };
 
 const getAll = async (payload) => {
   const { userId, customerId } = payload;
 
-  const response = await RealEstateModel.findAll({
+  const response = await VehicleModel.findAll({
     attributes: { exclude: [ 'id' ] },
     where: { user_id: customerId || userId, is_deleted: false },
   });
@@ -60,7 +60,7 @@ const patch = async (payload) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const response = await RealEstateModel.findOne({
+    const response = await VehicleModel.findOne({
       where: { public_id: publicId },
       transaction,
       lock: transaction.LOCK.UPDATE,
@@ -69,7 +69,7 @@ const patch = async (payload) => {
     if (!response) {
       await transaction.rollback();
 
-      return { errors: [ { name: 'RealEstate', message: 'No record found.' } ] };
+      return { errors: [ { name: 'Vehicle', message: 'No record found.' } ] };
     }
 
     const convertedData = camelToSnake(newDoc);
@@ -82,7 +82,7 @@ const patch = async (payload) => {
       return { errors: encryptionErrors };
     }
 
-    await RealEstateModel.update(
+    await VehicleModel.update(
       {
         ...convertedData,
         updated_by: updatedBy,
@@ -100,13 +100,13 @@ const patch = async (payload) => {
     await transaction.rollback();
     console.error('Patch error:', error.message);
 
-    return { errors: [ { name: 'patch', message: 'An error occurred while updating the real estate data.' } ] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating the vehicle data.' } ] };
   }
 };
 const deleted = async (payload) => {
   const { publicId, updatedBy } = payload;
 
-  const res = await RealEstateModel.findOne({
+  const res = await VehicleModel.findOne({
     where: { public_id: publicId },
   });
 
@@ -117,12 +117,12 @@ const deleted = async (payload) => {
       return { errors: [ { name: 'publicId', message: 'already deleted!' } ] };
     }
 
-    await RealEstateModel.update({ is_deleted: true, updated_by: updatedBy }, { where: { public_id: publicId } });
+    await VehicleModel.update({ is_deleted: true, updated_by: updatedBy }, { where: { public_id: publicId } });
 
     return { doc: { message: 'successfully deleted!' } };
   }
 
-  return { errors: [ { name: 'publicId', message: 'no real estate record found!' } ] };
+  return { errors: [ { name: 'publicId', message: 'no vehicle record found!' } ] };
 };
 
 module.exports = {

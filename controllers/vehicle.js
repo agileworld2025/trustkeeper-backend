@@ -1,32 +1,53 @@
 /* eslint-disable no-console */
 const path = require('path');
-const RealEstateService = require('../service/real-estate');
+const VehicleService = require('../service/vehicle');
 const Validator = require('../utils/validator');
-const { patch: patchSchema, deleted: deletedSchema } = require('../dto-schemas/real-estate');
+const { patch: patchSchema, save: saveSchema } = require('../dto-schemas/vehicle/index');
+const { deleted: deletedSchema } = require('../dto-schemas/bank');
 
 const save = async (req, res) => {
   try {
     const { body, file, auth: { userId, customerId } } = req;
+
+    // Convert string value to number if present
+    if (body.value && typeof body.value === 'string') {
+      body.value = parseFloat(body.value);
+    }
+
     const data = {
       ...body,
       userId,
-      ...(file ? { image: file.path } : {}),
+      ...(file ? { photos: [ file.path ] } : {}),
     };
 
     if (customerId) {
-      return res.status(400).json({ status: 'error', message: 'Relative cannot save the customer real estate' });
+      return res.status(400).json({ status: 'error', message: 'Relative cannot save the customer vehicle' });
     }
 
-    // const { errors, data } = Validator.isSchemaValid({
-    //   data: { ...body, userId, image: file ? file.path : null },
-    //   schema: saveSchema,
-    // });
+    // Filter out unwanted properties and ensure proper types
+    const filteredData = {
+      vehicleType: data.vehicleType,
+      ownershipDetails: data.ownershipDetails,
+      value: data.value,
+      currency: data.currency,
+      insuranceDetails: data.insuranceDetails,
+      leaseDetails: data.leaseDetails,
+      country: data.country,
+      documents: data.documents,
+      photos: data.photos,
+      userId: data.userId,
+    };
 
-    // if (errors) {
-    //   return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
-    // }
+    const { errors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...filteredData, image: file ? file.path : null },
+      schema: saveSchema,
+    });
 
-    const { errors: err, doc } = await RealEstateService.save(data);
+    if (errors) {
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
+    }
+
+    const { errors: err, doc } = await VehicleService.save(validatedData);
 
     if (doc) {
       const { publicId } = doc;
@@ -47,13 +68,13 @@ const getAll = async (req, res) => {
   try {
     const { auth: { userId, customerId } } = req;
 
-    const { count, doc } = await RealEstateService.getAll({ userId, customerId });
+    const { count, doc } = await VehicleService.getAll({ userId, customerId });
 
     const transformedData = doc.map((item) => {
-      // Handle image URL transformation if image exists
-      if (item.image) {
+      // Handle photos URL transformation if photos exist
+      if (item.photos && Array.isArray(item.photos)) {
         // eslint-disable-next-line no-param-reassign
-        item.image = `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(item.image)}`;
+        item.photos = item.photos.map((photo) => `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(photo)}`);
       }
 
       return {
@@ -85,19 +106,38 @@ const patch = async (req, res) => {
 
     const body = { ...req.body };
 
+    // Convert string value to number if present
+    if (body.value && typeof body.value === 'string') {
+      body.value = parseFloat(body.value);
+    }
+
     if (req.file) {
-      body.image = req.file.path;
+      body.photos = [ req.file.path ];
     }
 
     if (customerId) {
       return res.status(403).json({
         status: 'error',
-        message: 'Relative cannot edit the customer real estate',
+        message: 'Relative cannot edit the customer vehicle',
       });
     }
 
+    // Filter out unwanted properties and ensure proper types
+    const filteredBody = {
+      vehicleType: body.vehicleType,
+      ownershipDetails: body.ownershipDetails,
+      value: body.value,
+      currency: body.currency,
+      insuranceDetails: body.insuranceDetails,
+      leaseDetails: body.leaseDetails,
+      country: body.country,
+      documents: body.documents,
+      image: body.image,
+      photos: body.photos,
+    };
+
     const { errors, data } = Validator.isSchemaValid({
-      data: { ...body, publicId, updatedBy: userId },
+      data: { ...filteredBody, publicId, updatedBy: userId },
       schema: patchSchema,
     });
 
@@ -109,7 +149,7 @@ const patch = async (req, res) => {
       });
     }
 
-    const { errors: err, doc } = await RealEstateService.patch(data);
+    const { errors: err, doc } = await VehicleService.patch(data);
 
     if (err) {
       return res.status(422).json({
@@ -122,7 +162,7 @@ const patch = async (req, res) => {
     if (!doc) {
       return res.status(404).json({
         status: 'error',
-        message: 'Real estate property not found',
+        message: 'Vehicle not found',
       });
     }
 
@@ -143,7 +183,7 @@ const deleted = async (req, res) => {
     const { params: { publicId }, auth: { userId: updatedBy, customerId } } = req;
 
     if (customerId) {
-      return res.status(400).json({ status: 'error', message: 'Relative can not delete the customer real estate' });
+      return res.status(400).json({ status: 'error', message: 'Relative can not delete the customer vehicle' });
     }
 
     const data = { publicId, updatedBy };
@@ -154,7 +194,7 @@ const deleted = async (req, res) => {
       return res.badRequest('field-validation', errors);
     }
 
-    const { errors: err, doc } = await RealEstateService.deleted(data);
+    const { errors: err, doc } = await VehicleService.deleted(data);
 
     if (doc) {
       res.setHeader('message', 'successfully deleted!');
