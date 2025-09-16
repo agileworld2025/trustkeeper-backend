@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 /* eslint-disable no-console */
 const path = require('path');
 const BusinessOwnershipService = require('../service/business-ownership');
@@ -73,40 +74,17 @@ const getAll = async (req, res) => {
     const { count, doc } = await BusinessOwnershipService.getAll({ userId, customerId });
 
     const transformedData = doc.map((item) => {
-      let parsedData;
-
-      try {
-        const rawData = item.decryptedData && item.decryptedData.data;
-
-        parsedData = rawData ? JSON.parse(rawData) : {};
-      } catch (error) {
-        console.error('Error parsing data:', error);
-        parsedData = {};
-      }
-
       // Transform document paths to full URLs
-      if (parsedData.businessDocuments && Array.isArray(parsedData.businessDocuments)) {
-        parsedData.businessDocuments = parsedData.businessDocuments.map((docPath) => `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(docPath)}`);
+      if (item.businessDocuments && Array.isArray(item.businessDocuments)) {
+        item.businessDocuments = item.businessDocuments.map((docPath) => `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(docPath)}`);
       }
 
       // Transform photo paths to full URLs
-      if (parsedData.photos && Array.isArray(parsedData.photos)) {
-        parsedData.photos = parsedData.photos.map((photo) => `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(photo)}`);
+      if (item.photos && Array.isArray(item.photos)) {
+        item.photos = item.photos.map((photo) => `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(photo)}`);
       }
 
-      return {
-        publicId: item.publicId,
-        userId: item.userId,
-        createdBy: item.createdBy,
-        updatedBy: item.updatedBy,
-        isDeleted: item.isDeleted,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-        decryptedData: {
-          ...item.decryptedData,
-          data: parsedData,
-        },
-      };
+      return item;
     });
 
     res.setHeader('x-coreplatform-paging-limit', count);

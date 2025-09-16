@@ -3,16 +3,9 @@ const { v1: uuidV1 } = require('uuid');
 const { business_ownership: BusinessOwnershipModel, sequelize } = require('../database');
 const Helper = require('../utils/helper');
 
-const { encryptData } = require('../utils/senitize-data');
-
 const save = async (data) => {
   try {
-    const { errors: encryptionErrors } = await encryptData(data);
     const convertedData = Helper.camelToSnake(data);
-
-    if (encryptionErrors) {
-      return { errors: encryptionErrors };
-    }
     const publicId = uuidV1();
 
     await BusinessOwnershipModel.create({
@@ -71,14 +64,6 @@ const patch = async (payload) => {
     }
 
     const convertedData = Helper.camelToSnake(newDoc);
-
-    const { errors: encryptionErrors } = await encryptData(convertedData);
-
-    if (encryptionErrors) {
-      await transaction.rollback();
-
-      return { errors: encryptionErrors };
-    }
 
     await BusinessOwnershipModel.update(
       {
