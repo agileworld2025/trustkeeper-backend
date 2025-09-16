@@ -3,7 +3,7 @@ const { v1: uuidV1 } = require('uuid');
 const { business_ownership: BusinessOwnershipModel, sequelize } = require('../database');
 const Helper = require('../utils/helper');
 
-const { encryptData, decryptData } = require('../utils/senitize-data');
+const { encryptData } = require('../utils/senitize-data');
 
 const save = async (data) => {
   try {
@@ -43,26 +43,13 @@ const getAll = async (payload) => {
     return { count: 0, doc: [] };
   }
 
-  const decryptedDocs = await Promise.all(
-    response.map(async (element) => {
-      const record = Helper.convertSnakeToCamel(element.dataValues);
+  const docs = response.map((element) => {
+    const record = Helper.convertSnakeToCamel(element.dataValues);
 
-      const { data: decryptedData, errors: decryptionErrors } = await decryptData(record.encryptedId);
+    return record;
+  });
 
-      if (decryptionErrors) {
-        console.error(`Decryption error for encryptedData: ${record.encryptedId}`);
-        record.decryptedData = null;
-      } else {
-        record.decryptedData = decryptedData;
-      }
-
-      delete record.encryptedId;
-
-      return record;
-    }),
-  );
-
-  return { count: decryptedDocs.length, doc: decryptedDocs };
+  return { count: docs.length, doc: docs };
 };
 
 const patch = async (payload) => {
