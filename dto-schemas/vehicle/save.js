@@ -14,8 +14,8 @@ const save = {
     },
     value: {
       oneOf: [
-        { type: 'string', pattern: '^[0-9]+(\.[0-9]+)?$' },
-        { type: 'number', minimum: 0 }
+        { type: 'string', pattern: '^[0-9]+(\\.[0-9]+)?$' },
+        { type: 'number', minimum: 0 },
       ],
       description: 'Estimated or current value of the vehicle',
     },
@@ -46,8 +46,11 @@ const save = {
       description: 'Array of uploaded vehicle documents (.pdf, .docx, etc.)',
     },
     image: {
-      type: 'string',
-      description: 'Image path for the vehicle',
+      oneOf: [
+        { type: 'string' },
+        { type: 'null' },
+      ],
+      description: 'Image path for the vehicle (optional)',
     },
     userId: {
       type: 'string',
@@ -55,7 +58,7 @@ const save = {
       format: 'uuid',
     },
   },
-  required: ['vehicleType', 'userId'],
+  required: [ 'vehicleType', 'userId' ],
   additionalProperties: true,
 };
 

@@ -1,37 +1,41 @@
 /* eslint-disable no-console */
 const path = require('path');
-const VehicleService = require('../service/vehicle');
+const BusinessOwnershipService = require('../service/business-ownership');
 const Validator = require('../utils/validator');
-const { patch: patchSchema, save: saveSchema } = require('../dto-schemas/vehicle/index');
-const { deleted: deletedSchema } = require('../dto-schemas/bank');
+const { save: saveSchema, patch: patchSchema } = require('../dto-schemas/business-ownership');
 
 const save = async (req, res) => {
   try {
-    const { body, file, auth: { userId, customerId } } = req;
+    const { body, files, auth: { userId, customerId } } = req;
 
-    if (body.value && typeof body.value === 'string') {
-      body.value = parseFloat(body.value);
+    if (body.businessValue && typeof body.businessValue === 'string') {
+      body.businessValue = parseFloat(body.businessValue);
+    }
+
+    if (body.ownershipPercentage && typeof body.ownershipPercentage === 'string') {
+      body.ownershipPercentage = parseFloat(body.ownershipPercentage);
     }
 
     const data = {
       ...body,
       userId,
-      ...(file ? { photos: [ file.path ] } : {}),
+      ...(files ? { businessDocuments: files.map((file) => file.path) } : {}),
     };
 
     if (customerId) {
-      return res.status(400).json({ status: 'error', message: 'Relative cannot save the customer vehicle' });
+      return res.status(400).json({ status: 'error', message: 'Relative cannot save the customer business ownership' });
     }
 
     const filteredData = {
-      vehicleType: data.vehicleType,
-      ownershipDetails: data.ownershipDetails,
-      value: data.value,
+      businessName: data.businessName,
+      businessType: data.businessType,
+      ownershipPercentage: data.ownershipPercentage,
+      businessValue: data.businessValue,
       currency: data.currency,
-      insuranceDetails: data.insuranceDetails,
-      leaseDetails: data.leaseDetails,
+      businessAddress: data.businessAddress,
+      registrationNumber: data.registrationNumber,
       country: data.country,
-      documents: data.documents,
+      businessDocuments: data.businessDocuments,
       photos: data.photos,
       userId: data.userId,
     };
@@ -45,7 +49,7 @@ const save = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
     }
 
-    const { errors: err, doc } = await VehicleService.save(validatedData);
+    const { errors: err, doc } = await BusinessOwnershipService.save(validatedData);
 
     if (doc) {
       const { publicId } = doc;
@@ -66,12 +70,28 @@ const getAll = async (req, res) => {
   try {
     const { auth: { userId, customerId } } = req;
 
-    const { count, doc } = await VehicleService.getAll({ userId, customerId });
+    const { count, doc } = await BusinessOwnershipService.getAll({ userId, customerId });
 
     const transformedData = doc.map((item) => {
-      if (item.photos && Array.isArray(item.photos)) {
-        // eslint-disable-next-line no-param-reassign
-        item.photos = item.photos.map((photo) => `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(photo)}`);
+      let parsedData;
+
+      try {
+        const rawData = item.decryptedData && item.decryptedData.data;
+
+        parsedData = rawData ? JSON.parse(rawData) : {};
+      } catch (error) {
+        console.error('Error parsing data:', error);
+        parsedData = {};
+      }
+
+      // Transform document paths to full URLs
+      if (parsedData.businessDocuments && Array.isArray(parsedData.businessDocuments)) {
+        parsedData.businessDocuments = parsedData.businessDocuments.map((docPath) => `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(docPath)}`);
+      }
+
+      // Transform photo paths to full URLs
+      if (parsedData.photos && Array.isArray(parsedData.photos)) {
+        parsedData.photos = parsedData.photos.map((photo) => `${req.protocol}://${req.get('host')}/api/uploads/${path.basename(photo)}`);
       }
 
       return {
@@ -82,7 +102,10 @@ const getAll = async (req, res) => {
         isDeleted: item.isDeleted,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
-        ...item,
+        decryptedData: {
+          ...item.decryptedData,
+          data: parsedData,
+        },
       };
     });
 
@@ -103,31 +126,35 @@ const patch = async (req, res) => {
 
     const body = { ...req.body };
 
-    if (body.value && typeof body.value === 'string') {
-      body.value = parseFloat(body.value);
+    if (body.businessValue && typeof body.businessValue === 'string') {
+      body.businessValue = parseFloat(body.businessValue);
     }
 
-    if (req.file) {
-      body.photos = [ req.file.path ];
+    if (body.ownershipPercentage && typeof body.ownershipPercentage === 'string') {
+      body.ownershipPercentage = parseFloat(body.ownershipPercentage);
+    }
+
+    if (req.files && req.files.length > 0) {
+      body.businessDocuments = req.files.map((file) => file.path);
     }
 
     if (customerId) {
       return res.status(403).json({
         status: 'error',
-        message: 'Relative cannot edit the customer vehicle',
+        message: 'Relative cannot edit the customer business ownership',
       });
     }
 
     const filteredBody = {
-      vehicleType: body.vehicleType,
-      ownershipDetails: body.ownershipDetails,
-      value: body.value,
+      businessName: body.businessName,
+      businessType: body.businessType,
+      ownershipPercentage: body.ownershipPercentage,
+      businessValue: body.businessValue,
       currency: body.currency,
-      insuranceDetails: body.insuranceDetails,
-      leaseDetails: body.leaseDetails,
+      businessAddress: body.businessAddress,
+      registrationNumber: body.registrationNumber,
       country: body.country,
-      documents: body.documents,
-      image: body.image,
+      businessDocuments: body.businessDocuments,
       photos: body.photos,
     };
 
@@ -144,7 +171,7 @@ const patch = async (req, res) => {
       });
     }
 
-    const { errors: err, doc } = await VehicleService.patch(data);
+    const { errors: err, doc } = await BusinessOwnershipService.patch(data);
 
     if (err) {
       return res.status(422).json({
@@ -157,7 +184,7 @@ const patch = async (req, res) => {
     if (!doc) {
       return res.status(404).json({
         status: 'error',
-        message: 'Vehicle not found',
+        message: 'Business ownership not found',
       });
     }
 
@@ -177,19 +204,21 @@ const deleted = async (req, res) => {
   try {
     const { params: { publicId }, auth: { userId: updatedBy, customerId } } = req;
 
+    if (!publicId) {
+      return res.status(400).json({ status: 'error', message: 'Invalid public ID' });
+    }
+
     if (customerId) {
-      return res.status(400).json({ status: 'error', message: 'Relative can not delete the customer vehicle' });
+      return res.status(400).json({ status: 'error', message: 'Relative can not delete the customer business ownership' });
     }
 
     const data = { publicId, updatedBy };
 
-    const { errors } = Validator.isSchemaValid({ data, schema: deletedSchema });
+    const { errors: err, doc } = await BusinessOwnershipService.deleted(data);
 
-    if (errors) {
-      return res.badRequest('field-validation', errors);
+    if (err) {
+      return res.status(400).json({ status: 'error', message: 'Validation failed', errors: err });
     }
-
-    const { errors: err, doc } = await VehicleService.deleted(data);
 
     if (doc) {
       res.setHeader('message', 'successfully deleted!');
@@ -197,7 +226,7 @@ const deleted = async (req, res) => {
       return res.status(200).json({ status: 'success', message: 'Successfully deleted!' });
     }
 
-    return res.status(400).json({ status: 'error', message: 'Field validation failed', errors: err });
+    return res.status(404).json({ status: 'error', message: 'Business ownership not found' });
   } catch (error) {
     return res.status(500).json({ status: 'error', message: 'Internal server error' });
   }

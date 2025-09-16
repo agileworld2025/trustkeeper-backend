@@ -1,8 +1,7 @@
-'use strict';
-
+/* eslint-disable filenames/match-regex */
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
-  async up (queryInterface, Sequelize) {
+  async up(queryInterface, Sequelize) {
     await queryInterface.createTable('gold_details', {
       id: {
         allowNull: false,
@@ -68,7 +67,7 @@ module.exports = {
     });
   },
 
-  async down (queryInterface, Sequelize) {
+  async down(queryInterface) {
     await queryInterface.dropTable('gold_details');
-  }
+  },
 };

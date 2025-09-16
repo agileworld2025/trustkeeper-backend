@@ -19,7 +19,7 @@ const patch = {
     value: {
       oneOf: [
         { type: 'string', pattern: '^[0-9]+(\.[0-9]+)?$' },
-        { type: 'number', minimum: 0 }
+        { type: 'number', minimum: 0 },
       ],
       description: 'Estimated or current value of the vehicle',
     },
@@ -50,8 +50,11 @@ const patch = {
       description: 'Array of uploaded vehicle documents (.pdf, .docx, etc.)',
     },
     image: {
-      type: 'string',
-      description: 'Image path for the vehicle',
+      oneOf: [
+        { type: 'string' },
+        { type: 'null' },
+      ],
+      description: 'Image path for the vehicle (optional)',
     },
     updatedBy: {
       type: 'string',
@@ -59,7 +62,7 @@ const patch = {
       format: 'uuid',
     },
   },
-  required: ['publicId', 'updatedBy'],
+  required: [ 'publicId', 'updatedBy' ],
   additionalProperties: true,
 };
 
