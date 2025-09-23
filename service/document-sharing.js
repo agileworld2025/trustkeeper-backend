@@ -176,7 +176,7 @@ const shareDocument = async (payload) => {
     });
 
     // Generate sharing URL
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.BASE_URL || 'https://trustkeeperbe-cschabgpbjhdakev.eastus-01.azurewebsites.net';
     const sharingUrl = `${baseUrl}/api/document-sharing/view/${sharingToken}`;
 
     const documentDataForEmail = convertSnakeToCamel(document.dataValues);
