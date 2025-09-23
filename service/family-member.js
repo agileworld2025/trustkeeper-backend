@@ -3,7 +3,6 @@ const { v1: uuidV1 } = require('uuid');
 const { user_relation: UserRelationModel } = require('../database');
 const { convertSnakeToCamel } = require('../utils/helper');
 
-// Add family member to sharing
 const addFamilyMember = async (payload, userId) => {
   try {
     const {
@@ -18,17 +17,20 @@ const addFamilyMember = async (payload, userId) => {
       accessLevel = 'view_only',
     } = payload;
 
-    // Validate required fields
-    if (!name || !email || !relationType) {
-      return {
-        errors: [ {
-          name: 'addFamilyMember',
-          message: 'Name, email, and relation type are required',
-        } ],
-      };
-    }
+    const relationData = {
+      name,
+      email,
+      mobile_number: phone,
+      alternate_phone: alternatePhone,
+      country_code: countryCode,
+      alternate_country_code: alternateCountryCode,
+      address_line_1: address,
+      relation_type: relationType,
+      access_level: accessLevel,
+      is_active: true,
+      relative_of: userId,
+    };
 
-    // Create or update user relation
     const [ userRelation, created ] = await UserRelationModel.findOrCreate({
       where: {
         user_id: userId,
@@ -36,34 +38,12 @@ const addFamilyMember = async (payload, userId) => {
       },
       defaults: {
         public_id: uuidV1(),
-        name,
-        email,
-        mobile_number: phone || null,
-        alternate_phone: alternatePhone || null,
-        country_code: countryCode,
-        alternate_country_code: alternateCountryCode,
-        address_line_1: address || null,
-        relation_type: relationType,
-        access_level: accessLevel,
-        is_active: true,
-        // Set relative_of to the same user for now
-        relative_of: userId,
+        ...relationData,
       },
     });
 
     if (!created) {
-      // Update existing relation
-      await userRelation.update({
-        name,
-        mobile_number: phone || null,
-        alternate_phone: alternatePhone || null,
-        country_code: countryCode,
-        alternate_country_code: alternateCountryCode,
-        address_line_1: address || null,
-        relation_type: relationType,
-        access_level: accessLevel,
-        is_active: true,
-      });
+      await userRelation.update(relationData);
     }
 
     return {
@@ -85,6 +65,35 @@ const addFamilyMember = async (payload, userId) => {
   }
 };
 
+const getFamilyMembers = async (userId) => {
+  try {
+    const familyMembers = await UserRelationModel.findAll({
+      where: {
+        user_id: userId,
+        is_active: true,
+      },
+      order: [ [ 'created_at', 'DESC' ] ],
+    });
+
+    const formattedFamilyMembers = familyMembers.map((member) => convertSnakeToCamel(member.dataValues));
+
+    return {
+      familyMembers: formattedFamilyMembers,
+      count: formattedFamilyMembers.length,
+    };
+  } catch (error) {
+    console.error('Get family members error:', error);
+
+    return {
+      errors: [ {
+        name: 'getFamilyMembers',
+        message: 'An error occurred while fetching family members',
+      } ],
+    };
+  }
+};
+
 module.exports = {
   addFamilyMember,
+  getFamilyMembers,
 };

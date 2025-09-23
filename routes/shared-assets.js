@@ -8,5 +8,4 @@ module.exports = (router) => {
   router.post('/shared-assets/send-download-notification', SharedAssetsController.sendAppDownloadNotification);
   router.post('/shared-assets/for-app', SharedAssetsController.getSharedAssetsForApp);
   router.get('/shared-assets/trustkeeper-interface', SharedAssetsController.getTrustKeeperSharingInterface);
-  router.post('/shared-assets/add-family-member', SharedAssetsController.addFamilyMember);
 };
