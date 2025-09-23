@@ -516,11 +516,171 @@ const sendAppNotificationEmail = async (emailData) => {
   }
 };
 
+// Send family member addition notification email
+const sendFamilyMemberAdditionEmail = async (emailData) => {
+  try {
+    const {
+      recipientEmail,
+      recipientName,
+      ownerName,
+      familyMemberName,
+      relationType,
+      accessLevel,
+      appName,
+    } = emailData;
+
+    const mailOptions = {
+      from: `"${process.env.APP_NAME || 'TrustKeeper'}" <${emailConfig.auth.user}>`,
+      to: recipientEmail,
+      subject: `${ownerName} has added you as a family member in ${appName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Family Member Added</title>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+              color: white; 
+              padding: 30px; 
+              border-radius: 8px; 
+              margin-bottom: 20px; 
+              text-align: center; 
+            }
+            .content { padding: 20px; }
+            .button { 
+              display: inline-block; 
+              background: #007bff; 
+              color: white; 
+              padding: 15px 30px; 
+              text-decoration: none; 
+              border-radius: 25px; 
+              margin: 20px 0;
+              font-weight: 600;
+              font-size: 16px;
+            }
+            .button:hover { background: #0056b3; }
+            .footer { 
+              background: #f8f9fa; 
+              padding: 15px; 
+              border-radius: 8px; 
+              margin-top: 20px; 
+              font-size: 12px; 
+              color: #666;
+            }
+            .family-info {
+              background: #e8f5e8;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              border-left: 4px solid #28a745;
+            }
+            .access-level {
+              background: #e3f2fd;
+              padding: 15px;
+              border-radius: 5px;
+              margin: 15px 0;
+              border-left: 4px solid #2196f3;
+            }
+            .app-section {
+              background: #fff3cd;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              text-align: center;
+              border: 1px solid #ffeaa7;
+            }
+            .app-logo {
+              font-size: 48px;
+              margin-bottom: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="app-logo">👨‍👩‍👧‍👦</div>
+              <h1>Family Member Added</h1>
+              <p>You've been added as a family member in ${appName}</p>
+            </div>
+            
+            <div class="content">
+              <p>Hello ${recipientName || 'there'},</p>
+              
+              <p><strong>${ownerName}</strong> has added you as a family member in the ${appName} app.</p>
+              
+              <div class="family-info">
+                <h3>👨‍👩‍👧‍👦 Family Member Details</h3>
+                <p><strong>Your Name:</strong> ${familyMemberName || recipientName}</p>
+                <p><strong>Relationship:</strong> ${relationType || 'Family Member'}</p>
+                <p><strong>Added by:</strong> ${ownerName}</p>
+              </div>
+              
+              <div class="access-level">
+                <h3>🔐 Access Level</h3>
+                <p><strong>Current Access:</strong> ${accessLevel || 'View Only'}</p>
+                <p>You can view shared family assets and documents based on your access level.</p>
+              </div>
+              
+              <div class="app-section">
+                <div class="app-logo">📱</div>
+                <h3>Get Started with ${appName}</h3>
+                <p>Download the ${appName} app to access your family's shared assets and documents securely.</p>
+                <a href="${process.env.APP_DOWNLOAD_URL || 'https://play.google.com/store/apps/details?id=com.get.paisa'}" class="button">Download ${appName} App</a>
+              </div>
+              
+              <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <strong>🔒 What you can do:</strong>
+                <ul>
+                  <li>View shared family assets and documents</li>
+                  <li>Access important family information securely</li>
+                  <li>Stay updated with family notifications</li>
+                  <li>Manage your family profile</li>
+                </ul>
+              </div>
+              
+              <p><strong>Next Steps:</strong></p>
+              <ol>
+                <li>Download the ${appName} app using the link above</li>
+                <li>Create your account using this email address: <strong>${recipientEmail}</strong></li>
+                <li>Access your family's shared assets in the app</li>
+                <li>Start collaborating with your family members</li>
+              </ol>
+            </div>
+            
+            <div class="footer">
+              <p>This invitation was sent by ${ownerName} through ${appName}.</p>
+              <p>If you have any questions, please contact ${ownerName} directly.</p>
+              <p>© 2024 ${appName}. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+
+    console.log('Family member addition email sent successfully:', info.messageId);
+
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('Send family member addition email error:', error);
+
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   generateSharingToken,
   sendDocumentSharingEmail,
   sendSharingNotificationToOwner,
   sendAppDownloadEmail,
   sendAppNotificationEmail,
+  sendFamilyMemberAdditionEmail,
   transporter,
 };

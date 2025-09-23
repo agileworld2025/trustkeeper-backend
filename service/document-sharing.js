@@ -39,7 +39,7 @@ const {
   sendAppDownloadNotification,
   shareDocumentWithTrustKeeper: shareDocumentWithTrustKeeperIntegration,
 } = require('./trustkeeper-integration');
-const { getSharedAssetsForUser } = require('./shared-assets');
+const { getSharedAssetsForUser } = require('./shared-assets-helper');
 
 // Document type to model mapping
 const DOCUMENT_MODELS = {
@@ -475,6 +475,8 @@ const revokeSharing = async (payload) => {
     };
   }
 };
+
+// Shared assets functionality moved to shared-assets-helper.js
 
 // Send enhanced shared assets notification
 const sendEnhancedSharedAssetsNotification = async (payload) => {

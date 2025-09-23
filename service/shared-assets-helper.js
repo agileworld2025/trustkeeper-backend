@@ -28,18 +28,6 @@ const {
 } = require('../database');
 const { convertSnakeToCamel } = require('../utils/helper');
 
-// Generate avatar initials (helper function)
-const generateAvatar = (name) => {
-  if (!name) return 'U';
-  const names = name.split(' ');
-
-  if (names.length >= 2) {
-    return `${names[0][0]}${names[1][0]}`.toUpperCase();
-  }
-
-  return name[0].toUpperCase();
-};
-
 // Document type to model mapping
 const DOCUMENT_MODELS = {
   will_testament: WillTestamentModel,
@@ -63,7 +51,19 @@ const DOCUMENT_MODELS = {
   legal_advisor: LegalAdvisorModel,
 };
 
-// Get shared assets for user (helper function)
+// Generate avatar initials (helper function)
+const generateAvatar = (name) => {
+  if (!name) return 'U';
+  const names = name.split(' ');
+
+  if (names.length >= 2) {
+    return `${names[0][0]}${names[1][0]}`.toUpperCase();
+  }
+
+  return name[0].toUpperCase();
+};
+
+// Get shared assets for user (consolidated from shared-assets service)
 const getSharedAssetsForUser = async (payload) => {
   try {
     const { userId, userEmail } = payload;

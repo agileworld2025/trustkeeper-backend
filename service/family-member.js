@@ -1,7 +1,8 @@
 /* eslint-disable no-console */
 const { v1: uuidV1 } = require('uuid');
-const { user_relation: UserRelationModel } = require('../database');
+const { user_relation: UserRelationModel, user: UserModel } = require('../database');
 const { convertSnakeToCamel } = require('../utils/helper');
+const { sendFamilyMemberAdditionEmail } = require('../utils/email-service');
 
 const addFamilyMember = async (payload, userId) => {
   try {
@@ -44,6 +45,32 @@ const addFamilyMember = async (payload, userId) => {
 
     if (!created) {
       await userRelation.update(relationData);
+    }
+
+    // Send email notification to the family member
+    try {
+      // Get owner's information for email
+      const owner = await UserModel.findOne({
+        where: { public_id: userId },
+        attributes: [ 'name', 'email' ],
+      });
+
+      if (owner && email) {
+        await sendFamilyMemberAdditionEmail({
+          recipientEmail: email,
+          recipientName: name,
+          ownerName: owner.name || 'Family Member',
+          familyMemberName: name,
+          relationType,
+          accessLevel,
+          appName: process.env.APP_NAME || 'TrustKeeper',
+        });
+
+        console.log(`Family member addition email sent to: ${email}`);
+      }
+    } catch (emailError) {
+      console.error('Error sending family member addition email:', emailError);
+      // Don't fail the main operation if email fails
     }
 
     return {
