@@ -1,8 +1,10 @@
+/* eslint-disable max-len */
 const Ajv = require('ajv');
 const addFormats = require('ajv-formats');
 const addErrors = require('ajv-errors');
 
 const ajv = new Ajv({ allErrors: true });
+
 addFormats(ajv);
 addErrors(ajv);
 
@@ -46,12 +48,12 @@ const schema = {
     },
     relationType: {
       type: 'string',
-      enum: ['Spouse', 'Son', 'Daughter', 'Father', 'Mother', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Other'],
+      enum: [ 'Spouse', 'Son', 'Daughter', 'Father', 'Mother', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Uncle', 'Aunt', 'Cousin', 'Friend', 'Other' ],
       errorMessage: 'Relation type must be one of the valid options',
     },
     accessLevel: {
       type: 'string',
-      enum: ['view_only', 'can_edit', 'full_access'],
+      enum: [ 'view_only', 'can_edit', 'full_access' ],
       errorMessage: 'Access level must be view_only, can_edit, or full_access',
     },
     confirmEmail: {
@@ -60,21 +62,8 @@ const schema = {
       errorMessage: 'Confirm email must be a valid email address',
     },
   },
-  required: ['name', 'email', 'relationType'],
+  required: [ 'name', 'email', 'relationType' ],
   additionalProperties: false,
-  if: {
-    properties: {
-      confirmEmail: { type: 'string' }
-    }
-  },
-  then: {
-    properties: {
-      confirmEmail: {
-        const: { $data: '1/email' },
-        errorMessage: 'Confirm email must match email address'
-      }
-    }
-  },
   errorMessage: {
     required: {
       name: 'Name is required',
@@ -86,4 +75,41 @@ const schema = {
 
 const validate = ajv.compile(schema);
 
-module.exports = validate;
+// Custom validation function
+const customValidate = (data) => {
+  const isValid = validate(data);
+
+  if (!isValid) {
+    return false;
+  }
+
+  // Check if confirmEmail matches email when both are provided
+  if (data.confirmEmail && data.email && data.confirmEmail !== data.email) {
+    // Add custom error to the existing errors
+    if (!validate.errors) {
+      validate.errors = [];
+    }
+    validate.errors.push({
+      instancePath: '/confirmEmail',
+      schemaPath: '#/properties/confirmEmail',
+      keyword: 'custom',
+      message: 'Confirm email must match email address',
+      params: {},
+    });
+
+    return false;
+  }
+
+  return true;
+};
+
+// Create a wrapper that preserves the errors property
+const wrappedValidate = (data) => {
+  const result = customValidate(data);
+
+  wrappedValidate.errors = validate.errors;
+
+  return result;
+};
+
+module.exports = wrappedValidate;

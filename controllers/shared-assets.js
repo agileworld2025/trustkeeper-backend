@@ -278,9 +278,9 @@ const getTrustKeeperSharingInterface = async (req, res) => {
 const addFamilyMember = async (req, res) => {
   try {
     const { userId } = req.auth;
-    const payload = { ...req.body, userId };
 
-    const isValid = addFamilyMemberSchema(payload);
+    // Validate the request body first (without userId)
+    const isValid = addFamilyMemberSchema(req.body);
 
     if (!isValid) {
       return res.status(400).json({
@@ -289,7 +289,7 @@ const addFamilyMember = async (req, res) => {
       });
     }
 
-    const result = await FamilyMemberService.addFamilyMember(payload);
+    const result = await FamilyMemberService.addFamilyMember(req.body, userId);
 
     if (result.errors) {
       return res.status(400).json({
