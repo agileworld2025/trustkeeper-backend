@@ -27,7 +27,7 @@ module.exports = {
     RELATIVE: 'RELATIVE',
   },
 
-  CUSTOMER_IGNORE_PATH: [ '/api/register', '/api/verification', '/api/set-password', '/api/login', '/api/forget-password', '/api/reset-password', '/api/uploads' ],
+  CUSTOMER_IGNORE_PATH: [ '/api/register', '/api/verification', '/api/set-password', '/api/login', '/api/forget-password', '/api/reset-password', '/api/uploads', '/api/document-sharing/view' ],
 
   AUDIENCE_TYPE: {
     PLATFORM: 'PLATFORM',
