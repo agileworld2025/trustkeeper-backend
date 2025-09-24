@@ -35,7 +35,8 @@ function camelToSnake(obj) {
 
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+      // Updated regex to handle number followed by capital letter and number after letter
+      const snakeKey = key.replace(/([A-Z])/g, '_$1').replace(/(\d)([A-Z])/g, '$1_$2').replace(/([a-z])(\d)/g, '$1_$2').toLowerCase();
 
       result[snakeKey] = camelToSnake(obj[key]);
     }
