@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 module.exports = {
   USER_STATUS: {
     BLOCKED: 'BLOCKED',
