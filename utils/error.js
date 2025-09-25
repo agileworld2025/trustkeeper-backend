@@ -1,3 +1,4 @@
+/* eslint-disable linebreak-style */
 /* eslint-disable line-comment-position */
 /* eslint-disable max-len */
 module.exports = {
