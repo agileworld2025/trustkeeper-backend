@@ -1,5 +1,5 @@
 const { v1: uuidV1 } = require('uuid');
-const { 'real-estate': RealEstateModel } = require('../database');
+const { real_estate_records: RealEstateModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const encryptionConfig = require('../config/encryption-fields');
@@ -24,6 +24,7 @@ const save = async (data) => {
 
     return { doc: { publicId, message: 'real estate details successfully saved.' } };
   } catch (error) {
+    console.error('Real estate save error:', error);
     return { errors: [ { name: 'save', message: 'An error occurred while saving real estate data' } ] };
   }
 };

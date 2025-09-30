@@ -1,4 +1,6 @@
 const WillService = require('../service/will');
+const Validator = require('../utils/validator');
+const { save: saveSchema, patch: patchSchema, deleted: deletedSchema } = require('../dto-schemas/will-testament');
 
 const save = async (req, res) => {
   try {
@@ -13,7 +15,21 @@ const save = async (req, res) => {
 
     const data = { ...body, userId };
 
-    const { doc, errors } = await WillService.save(data);
+    // Validate input data using DTO schema
+    const { errors: validationErrors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...data },
+      schema: saveSchema,
+    });
+
+    if (validationErrors) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Field validation failed',
+        errors: validationErrors,
+      });
+    }
+
+    const { doc, errors } = await WillService.save(validatedData);
 
     if (errors) {
       return res.status(400).json({
@@ -84,9 +100,23 @@ const update = async (req, res) => {
       });
     }
 
-    const data = { ...body, userId, publicId };
+    const data = { ...body, userId, publicId, updatedBy: userId };
 
-    const { doc, errors } = await WillService.update(data);
+    // Validate input data using DTO schema
+    const { errors: validationErrors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...data },
+      schema: patchSchema,
+    });
+
+    if (validationErrors) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Field validation failed',
+        errors: validationErrors,
+      });
+    }
+
+    const { doc, errors } = await WillService.patch(validatedData);
 
     if (errors) {
       return res.status(400).json({
@@ -115,9 +145,23 @@ const deleted = async (req, res) => {
       });
     }
 
-    const data = { userId, publicId };
+    const data = { userId, publicId, updatedBy: userId };
 
-    const { doc, errors } = await WillService.deleted(data);
+    // Validate input data using DTO schema
+    const { errors: validationErrors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...data },
+      schema: deletedSchema,
+    });
+
+    if (validationErrors) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Field validation failed',
+        errors: validationErrors,
+      });
+    }
+
+    const { doc, errors } = await WillService.deleted(validatedData);
 
     if (errors) {
       return res.status(400).json({

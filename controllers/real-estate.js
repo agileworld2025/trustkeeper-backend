@@ -2,7 +2,7 @@
 const path = require('path');
 const RealEstateService = require('../service/real-estate');
 const Validator = require('../utils/validator');
-const { patch: patchSchema, deleted: deletedSchema } = require('../dto-schemas/real-estate');
+const { save: saveSchema, patch: patchSchema, deleted: deletedSchema } = require('../dto-schemas/real-estate');
 
 const save = async (req, res) => {
   try {
@@ -17,16 +17,16 @@ const save = async (req, res) => {
       return res.status(400).json({ status: 'error', message: 'Relative cannot save the customer real estate' });
     }
 
-    // const { errors, data } = Validator.isSchemaValid({
-    //   data: { ...body, userId, image: file ? file.path : null },
-    //   schema: saveSchema,
-    // });
+    const { errors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...body, userId, image: file ? file.path : null },
+      schema: saveSchema,
+    });
 
-    // if (errors) {
-    //   return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
-    // }
+    if (errors) {
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
+    }
 
-    const { errors: err, doc } = await RealEstateService.save(data);
+    const { errors: err, doc } = await RealEstateService.save(validatedData);
 
     if (doc) {
       const { publicId } = doc;
@@ -151,7 +151,7 @@ const deleted = async (req, res) => {
     const { errors } = Validator.isSchemaValid({ data, schema: deletedSchema });
 
     if (errors) {
-      return res.badRequest('field-validation', errors);
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
     }
 
     const { errors: err, doc } = await RealEstateService.deleted(data);

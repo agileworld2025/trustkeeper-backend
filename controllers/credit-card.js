@@ -97,13 +97,13 @@ const patch = async (req, res) => {
     });
 
     if (errors) {
-      return res.badRequest('field-validation', errors);
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
     }
 
     const { errors: err, doc } = await CreditCardService.patch(data);
 
     if (err) {
-      return res.badRequest('field-validation', err);
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors: err });
     }
 
     if (doc) {
@@ -131,7 +131,7 @@ const deleted = async (req, res) => {
     const { errors } = Validator.isSchemaValid({ data, schema: deletedSchema });
 
     if (errors) {
-      return res.badRequest('field-validation', errors);
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
     }
 
     const { errors: err, doc } = await CreditCardService.deleted(data);

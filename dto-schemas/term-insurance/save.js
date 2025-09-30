@@ -1,69 +1,49 @@
 const save = {
-  title: 'Save medical Policy Details',
-  description: 'Defines the structure for HTTP GET request body',
+  title: 'Save Term Insurance Details',
+  description: 'Defines the structure for HTTP POST request body to save term insurance details',
   type: 'object',
   properties: {
     policyNumber: {
       type: 'string',
-      description: 'Policy Number of the user’s medical Policy',
-    },
-    insuranseHoldername: {
-      type: 'string',
-      description: 'insuranse Holder name of the medical Policy',
-    },
-    dateOfCommence: {
-      type: 'string',
-      description: 'The date when the policy commenced (format: YYYY-MM-DD)',
+      description: 'Policy Number of the term insurance',
     },
     premiumAmount: {
-      type: 'string',
-      description: 'The premium Amount to be received on policy maturity',
+      type: 'number',
+      description: 'The premium amount for the term insurance',
     },
-    dateOfMaturity: {
-      type: 'string',
-      description: 'The date when the policy will mature (format: YYYY-MM-DD)',
+    sumAssured: {
+      type: 'number',
+      description: 'The sum assured amount',
     },
-    coverAmount: {
+    providerName: {
       type: 'string',
-      description: 'The cover Amount on policy',
+      description: 'The insurance provider name',
     },
-    frequency: {
+    beneficiaryName: {
       type: 'string',
-      description: 'The frequency of the premium payment (e.g., monthly, quarterly, yearly)',
+      description: 'The beneficiary name',
     },
-    renewal: {
+    country: {
       type: 'string',
-      description: 'The renewal date for the policy (format: YYYY-MM-DD)',
-    },
-    provider: {
-      type: 'string',
-      description: 'The policy provider',
+      description: 'Country where the policy is registered',
     },
     userId: {
       type: 'string',
       description: 'User ID of the creator',
       format: 'uuid',
     },
-    image: {
-      type: 'string',
-      description: 'Image file path',
-      nullable: true,
-    },
   },
+  required: ['policyNumber', 'premiumAmount', 'sumAssured', 'providerName', 'beneficiaryName', 'country', 'userId'],
   additionalProperties: false,
   errorMessage: {
     properties: {
-      insuranseHoldername: 'Parameter: name should be valid',
-      policyNumber: 'Parameter: account number should be valid',
-      dateOfCommence: 'Parameter: date Of Commence should be valid',
-      premiumAmount: 'Parameter: premium Amount should be valid',
-      dateOfMaturity: 'Parameter: date Of Maturity should be valid',
-      coverAmount: 'Parameter: cover Amount should be valid',
-      frequency: 'Parameter: frequency should be vali',
-      renewal: 'Parameter: renewal should be valid',
-      provider: 'Parameter: provider should be valid',
+      policyNumber: 'Parameter: policy number should be valid',
+      premiumAmount: 'Parameter: premium amount should be valid',
+      sumAssured: 'Parameter: sum assured should be valid',
+      providerName: 'Parameter: provider name should be valid',
+      beneficiaryName: 'Parameter: beneficiary name should be valid',
+      country: 'Parameter: country should be valid',
       userId: 'Parameter: userId should be valid',
-      image: 'Parameter: image should be valid',
     },
   },
 };

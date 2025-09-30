@@ -1,5 +1,5 @@
 const { v1: uuidV1 } = require('uuid');
-const { will: WillModel } = require('../database');
+const { will_testament: WillModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const { 'will-testament': encryptionFields } = require('../config/encryption-fields');
@@ -22,6 +22,7 @@ const save = async (data) => {
 
     return { doc: { publicId, message: 'will details successfully saved.' } };
   } catch (error) {
+    console.error('Will save error:', error.message);
     return { errors: [ { name: 'save', message: 'An error occurred while saving will data' } ] };
   }
 };

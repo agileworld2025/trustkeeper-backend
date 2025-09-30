@@ -90,11 +90,9 @@ module.exports = {
   ],
 
   'loan-details': [
-    'loan_account_number',
-    'loan_amount',
-    'emi_amount',
-    'bank_name',
-    'interest_rate',
+    'loan_number',
+    'owner_name',
+    'phone_number',
   ],
 
   'medical-policy': [
@@ -122,11 +120,9 @@ module.exports = {
   ],
 
   'real-estate': [
-    'property_address',
-    'registration_number',
-    'sale_deed_number',
-    'property_value',
-    'owner_name',
+    'ownership_details',
+    'insurance_details',
+    'mortgage_details',
   ],
 
   stocks: [
@@ -170,19 +166,16 @@ module.exports = {
   ],
 
   vehicle: [
-    'registration_number',
-    'chassis_number',
-    'engine_number',
-    'insurance_policy_number',
-    'owner_name',
+    'ownership_details',
+    'insurance_details',
+    'lease_details',
   ],
 
   'will-testament': [
-    'will_number',
-    'executor_name',
-    'beneficiary_name',
-    'asset_value',
-    'witness_name',
+    'executor',
+    'beneficiaries',
+    'assets_distribution',
+    'safe_storage',
   ],
 
   'document-sharing': [

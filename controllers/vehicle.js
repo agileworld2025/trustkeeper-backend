@@ -186,7 +186,7 @@ const deleted = async (req, res) => {
     const { errors } = Validator.isSchemaValid({ data, schema: deletedSchema });
 
     if (errors) {
-      return res.badRequest('field-validation', errors);
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
     }
 
     const { errors: err, doc } = await VehicleService.deleted(data);

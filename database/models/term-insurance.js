@@ -12,7 +12,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       encrypted_id: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
         allowNull: false,
       },
       created_by: { type: DataTypes.UUID },

@@ -1,5 +1,5 @@
 const { v1: uuidV1 } = require('uuid');
-const { insurance: InsuranceModel } = require('../database');
+const { insurances: InsuranceModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const encryptionConfig = require('../config/encryption-fields');

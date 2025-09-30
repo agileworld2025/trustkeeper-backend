@@ -1,5 +1,5 @@
 const { v1: uuidV1 } = require('uuid');
-const { 'term-insurance': TermInsuranceModel } = require('../database');
+const { term_insurance: TermInsuranceModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const encryptionConfig = require('../config/encryption-fields');
@@ -13,16 +13,20 @@ const save = async (data) => {
     // Encrypt sensitive fields before saving to database
     const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
+    // Store the entire encrypted payload as a single blob
+    const encryptedData = JSON.stringify(encryptedPayload);
+
     await TermInsuranceModel.create({
       public_id: publicId,
-      ...encryptedPayload,
+      encrypted_id: encryptedData,
       user_id: convertedPayload.user_id,
-      updated_by: convertedPayload.user_id,
       created_by: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
     });
 
     return { doc: { publicId, message: 'term insurance details successfully saved.' } };
   } catch (error) {
+    console.error('Term insurance save error:', error);
     return { errors: [{ name: 'save', message: 'An error occurred while saving term insurance data' }] };
   }
 };

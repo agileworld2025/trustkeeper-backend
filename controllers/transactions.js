@@ -14,7 +14,7 @@ const save = async (req, res) => {
     const { errors, data } = Validator.isSchemaValid({ data: { ...body, userId }, schema: saveSchema });
 
     if (errors) {
-      return res.badRequest('field-validation', errors);
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors });
     }
 
     const { errors: err, doc } = await TransactionsService.save(data);
