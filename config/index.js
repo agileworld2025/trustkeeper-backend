@@ -6,6 +6,10 @@ module.exports = {
   DOMAIN: process.env.DOMAIN || 'http://localhost:3000',
   HOST: process.env.HOST || '0.0.0.0',
   PORT: process.env.PORT || 3000,
+  ENCRYPTION: {
+    KEY: process.env.ENCRYPTION_KEY || 'qwjdqweiyr328rewiufgewufgweiuf',
+    ALGORITHM: 'aes-256-gcm',
+  },
   DATABASE: {
     name: process.env.DB_NAME || 'trustkeeperbe',
     username: process.env.DB_USER_NAME || 'trustkeeperbe',

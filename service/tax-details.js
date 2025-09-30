@@ -1,217 +1,100 @@
 const { v1: uuidV1 } = require('uuid');
-const { tax_details: TaxDetailsModel } = require('../database');
+const { 'tax-details': TaxDetailsModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
 
-const save = async (payload) => {
+const encryptionFields = encryptionConfig['tax-details'] || [];
+
+const save = async (data) => {
   try {
     const publicId = uuidV1();
-    const convertedPayload = camelToSnake(payload);
-    const { taxIdNumber } = payload;
-    const isDuplicateEntry = await TaxDetailsModel.findOne({
-      where: {
-        tax_id_number: taxIdNumber,
-      },
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+
+    await TaxDetailsModel.create({
+      public_id: publicId,
+      ...encryptedPayload,
+      user_id: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
+      created_by: convertedPayload.user_id,
     });
 
-    if (isDuplicateEntry) {
-      return {
-        errors:
-        {
-          publicId,
-          message: 'Duplicate Entry',
-        },
-      };
-    }
-
-    if (!isDuplicateEntry) {
-      await TaxDetailsModel.create({
-        public_id: publicId,
-        ...convertedPayload,
-        user_id: convertedPayload.user_id,
-        updated_by: convertedPayload.user_id,
-        created_by: convertedPayload.user_id,
-      });
-    }
-
-    return {
-      doc: {
-        publicId,
-        message: 'Tax details successfully saved.',
-      },
-    };
+    return { doc: { publicId, message: 'tax details details successfully saved.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'savetaxDetails',
-          message: 'An error occurred while saving tax data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving tax details data' } ] };
   }
 };
 
 const getAll = async (payload) => {
   try {
-    const { userId } = payload;
+    const { userId, customerId } = payload;
 
-    const taxDetails = await TaxDetailsModel.findAll({
-      where: {
-        user_id: userId,
-        is_deleted: false,
-      },
+    const response = await TaxDetailsModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
     });
 
-    if (!taxDetails.length) {
-      return {
-        errors: [
-          {
-            name: 'savetaxDetails',
-            message: 'No tax details details found',
-          },
-        ],
-      };
+    if (!response.length) {
+      return { count: 0, doc: [] };
     }
 
-    return {
-      doc: taxDetails,
-    };
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'Tax',
-          message: 'An error occurred while fetching Tax details data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching tax details data' } ] };
   }
 };
 
-const update = async (payload) => {
+const patch = async (payload) => {
   try {
-    const {
-      publicId,
-      userId,
-      ...rest
-    } = payload;
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
 
-    const existingDetails = await TaxDetailsModel.findOne({
-      where: {
-        public_id: publicId,
-      },
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
+
+    const [ updatedCount ] = await TaxDetailsModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!existingDetails) {
-      return {
-        errors: [
-          {
-            name: 'Not Found',
-            message: 'Data Not Found',
-          },
-        ],
-      };
-    }
-
-    const convertedPayload = camelToSnake(rest);
-
-    const [ updatedCount ] = await TaxDetailsModel.update(
-      {
-        ...convertedPayload,
-        updated_by: userId,
-
-      },
-      {
-        where: { public_id: publicId },
-      },
-    );
-
     if (!updatedCount) {
-      return {
-        errors: [
-          {
-            name: 'patchTaxDetails',
-            message: 'No Tax details details found',
-          },
-        ],
-      };
+      return { errors: [ { name: 'patch', message: 'No tax details record found' } ] };
     }
 
-    return {
-      doc: {
-        publicId,
-        message: 'Tax details successfully updated.',
-      },
-    };
+    return { doc: { message: 'tax details details successfully updated.', publicId } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'TaxDetails',
-          message: 'An error occurred while updating Tax details data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating tax details data' } ] };
   }
 };
 
 const deleted = async (payload) => {
   try {
-    const { publicId, userId } = payload;
+    const { publicId, updatedBy } = payload;
 
-    const existingDetail = await TaxDetailsModel.findOne({
-      where: { public_id: publicId, user_id: userId, is_deleted: false },
-    });
-
-    if (!existingDetail) {
-      return {
-        errors: [
-          {
-            name: 'deleteTaxDetails',
-            message: 'No Tax details found',
-          },
-        ],
-      };
-    }
-
-    const [ deletedCount ] = await TaxDetailsModel.update(
-      { is_deleted: true },
-      {
-        where: { public_id: publicId, user_id: userId },
-      },
+    const [ updatedCount ] = await TaxDetailsModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
-    if (!deletedCount) {
-      return {
-        errors: {
-          message: 'Something Went Wrong.',
-          publicId,
-        },
-      };
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No tax details record found' } ] };
     }
 
-    return {
-      doc: {
-        publicId,
-        message: 'Successfully Deleted',
-      },
-
-    };
+    return { doc: { message: 'tax details details successfully deleted.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'deleteTaxDetails',
-          message: 'An error occurred while deleting Tax data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting tax details data' } ] };
   }
 };
 
 module.exports = {
-  save,
-  getAll,
-  update,
-  deleted,
+  save, getAll, patch, deleted,
 };

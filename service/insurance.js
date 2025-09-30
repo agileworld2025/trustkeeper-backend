@@ -1,88 +1,100 @@
 const { v1: uuidV1 } = require('uuid');
-const { insurances: InsuranceModel } = require('../database');
-const { encryptData, decryptData } = require('../utils/senitize-data');
+const { insurance: InsuranceModel } = require('../database');
+const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
+
+const encryptionFields = encryptionConfig.insurance || [];
 
 const save = async (data) => {
   try {
-    // const { doc, errors: encryptionErrors } = await encryptData(data);
-
-    // if (encryptionErrors) {
-    //   return { errors: encryptionErrors };
-    // }
-
-    const { userId } = data;
-
     const publicId = uuidV1();
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
     await InsuranceModel.create({
-      user_id: userId, public_id: publicId, ...data,
+      public_id: publicId,
+      ...encryptedPayload,
+      user_id: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
+      created_by: convertedPayload.user_id,
     });
 
-    return { doc: { publicId, message: 'successfully saved.' } };
+    return { doc: { publicId, message: 'insurance details successfully saved.' } };
   } catch (error) {
-    return { errors: [ { name: 'save', message: 'An error occurred while saving the insurance data' } ] };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving insurance data' } ] };
   }
 };
 
 const getAll = async (payload) => {
   try {
-    const { type } = payload;
-
-    const whereClause = type ? { type } : {}; // If type exists, filter, else empty filter (fetch all)
+    const { userId, customerId } = payload;
 
     const response = await InsuranceModel.findAll({
-      where: whereClause,
-      order: [ [ 'created_at', 'DESC' ] ],
+      where: { user_id: customerId || userId, is_deleted: false },
     });
 
-    if (!response || response.length === 0) {
-      return { errors: [ { name: 'getAll', message: 'No insurance data found' } ] };
+    if (!response.length) {
+      return { count: 0, doc: [] };
     }
 
-    return { doc: response };
-  } catch (error) {
-    console.error('Error in InsuranceService.getAll:', error);
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
 
-    return { errors: [ { name: 'getAll', message: 'An error occurred while retrieving the insurance data' } ] };
+    return { count: decryptedDocs.length, doc: decryptedDocs };
+  } catch (error) {
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching insurance data' } ] };
   }
 };
 
-const patch = async (data) => {
+const patch = async (payload) => {
   try {
-    const response = await InsuranceModel.update(data, {
-      where: { public_id: data.publicId },
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
+
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
+
+    const [ updatedCount ] = await InsuranceModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!response) {
-      return { errors: [ { name: 'patch', message: 'No insurance data found' } ] };
+    if (!updatedCount) {
+      return { errors: [ { name: 'patch', message: 'No insurance record found' } ] };
     }
 
-    return { doc: response };
+    return { doc: { message: 'insurance details successfully updated.', publicId } };
   } catch (error) {
-    return { errors: [ { name: 'save', message: 'An error occurred while saving the insurance data' } ] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating insurance data' } ] };
   }
 };
 
 const deleted = async (payload) => {
   try {
-    const { publicId } = payload;
-    const response = await InsuranceModel.destroy({
-      where: { public_id: publicId },
-    });
+    const { publicId, updatedBy } = payload;
 
-    if (!response) {
-      return { errors: [ { name: 'deleted', message: 'No insurance data found' } ] };
+    const [ updatedCount ] = await InsuranceModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
+    );
+
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No insurance record found' } ] };
     }
 
-    return { doc: response };
+    return { doc: { message: 'insurance details successfully deleted.' } };
   } catch (error) {
-    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting the insurance data' } ] };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting insurance data' } ] };
   }
 };
 
 module.exports = {
-  save,
-  getAll,
-  patch,
-  deleted,
+  save, getAll, patch, deleted,
 };

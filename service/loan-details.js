@@ -1,196 +1,102 @@
 const { v1: uuidV1 } = require('uuid');
 const { loan_details: LoanDetailsModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
 
-const save = async (payload) => {
+const encryptionFields = encryptionConfig['loan-details'] || [];
+
+const save = async (data) => {
   try {
     const publicId = uuidV1();
-    const convertedPayload = camelToSnake(payload);
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
     await LoanDetailsModel.create({
       public_id: publicId,
-      ...convertedPayload,
+      ...encryptedPayload,
       user_id: convertedPayload.user_id,
       updated_by: convertedPayload.user_id,
       created_by: convertedPayload.user_id,
     });
 
-    return {
-      doc: {
-        publicId,
-        message: 'Loan details successfully saved.',
-      },
-    };
+    return { doc: { publicId, message: 'loan details details successfully saved.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'saveLoanDetails',
-          message: 'An error occurred while saving Loan data',
-        },
-      ],
-    };
+    // console.error('Loan details save error:', error);
+
+    return { errors: [ { name: 'save', message: 'An error occurred while saving loan details data' } ] };
   }
 };
 
 const getAll = async (payload) => {
   try {
-    const { userId } = payload;
+    const { userId, customerId } = payload;
 
-    const LoanDetails = await LoanDetailsModel.findAll({
-      where: { user_id: userId },
+    const response = await LoanDetailsModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
     });
 
-    if (!LoanDetails.length) {
-      return {
-        errors: [
-          {
-            name: 'saveLoanDetails',
-            message: 'No Loan details details found',
-          },
-        ],
-      };
+    if (!response.length) {
+      return { count: 0, doc: [] };
     }
 
-    return {
-      doc: LoanDetails,
-    };
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'Loan',
-          message: 'An error occurred while fetching Loan details data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching loan details data' } ] };
   }
 };
 
-const update = async (payload) => {
+const patch = async (payload) => {
   try {
-    const {
-      publicId,
-      userId,
-      ...rest
-    } = payload;
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
 
-    const existingDetails = await LoanDetailsModel.findOne({
-      where: {
-        public_id: publicId,
-      },
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
+
+    const [ updatedCount ] = await LoanDetailsModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!existingDetails) {
-      return {
-        errors: [
-          {
-            name: 'Not Found',
-            message: 'Data Not Found',
-          },
-        ],
-      };
-    }
-
-    const convertedPayload = camelToSnake(rest);
-
-    const [ updatedCount ] = await LoanDetailsModel.update(
-      {
-        ...convertedPayload,
-        updated_by: userId,
-
-      },
-      {
-        where: { public_id: publicId },
-      },
-    );
-
     if (!updatedCount) {
-      return {
-        errors: [
-          {
-            name: 'patchLoanDetails',
-            message: 'No Loan details details found',
-          },
-        ],
-      };
+      return { errors: [ { name: 'patch', message: 'No loan details record found' } ] };
     }
 
-    return {
-      doc: {
-        publicId,
-        message: 'Loan details successfully updated.',
-      },
-    };
+    return { doc: { message: 'loan details details successfully updated.', publicId } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'LoanDetails',
-          message: 'An error occurred while updating Loan details data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating loan details data' } ] };
   }
 };
 
 const deleted = async (payload) => {
   try {
-    const { publicId, userId } = payload;
+    const { publicId, updatedBy } = payload;
 
-    const existingDetail = await LoanDetailsModel.findOne({
-      where: { public_id: publicId, user_id: userId, is_deleted: false },
-    });
-
-    if (!existingDetail) {
-      return {
-        errors: [
-          {
-            name: 'deleteLoanDetails',
-            message: 'No Loan details found',
-          },
-        ],
-      };
-    }
-
-    const [ deletedCount ] = await LoanDetailsModel.update(
-      { is_deleted: true },
-      {
-        where: { public_id: publicId, user_id: userId },
-      },
+    const [ updatedCount ] = await LoanDetailsModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
-    if (!deletedCount) {
-      return {
-        errors: {
-          message: 'Something Went Wrong.',
-          publicId,
-        },
-      };
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No loan details record found' } ] };
     }
 
-    return {
-      doc: {
-        publicId,
-        message: 'Successfully Deleted',
-      },
-
-    };
+    return { doc: { message: 'loan details details successfully deleted.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'deleteLoanDetails',
-          message: 'An error occurred while deleting Loan data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting loan details data' } ] };
   }
 };
 
 module.exports = {
-  save,
-  getAll,
-  update,
-  deleted,
+  save, getAll, patch, deleted,
 };

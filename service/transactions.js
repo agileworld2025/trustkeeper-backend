@@ -1,66 +1,99 @@
-/* eslint-disable no-console */
 const { v1: uuidV1 } = require('uuid');
 const { transactions: TransactionsModel } = require('../database');
-const Helper = require('../utils/helper');
-const { encryptData, decryptData } = require('../utils/senitize-data');
+const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
+const encryptionFields = encryptionConfig['transactions'] || [];
 
 const save = async (data) => {
   try {
-    const { doc, errors: encryptionErrors } = await encryptData(data);
-
-    if (encryptionErrors) {
-      return { errors: encryptionErrors };
-    }
-
-    const { encryptDoc } = doc;
-    const { userId } = data;
-
     const publicId = uuidV1();
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
     await TransactionsModel.create({
-      user_id: userId, public_id: publicId, encrypted_id: encryptDoc, created_by: userId,
+      public_id: publicId,
+      ...encryptedPayload,
+      user_id: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
+      created_by: convertedPayload.user_id,
     });
 
-    return { doc: { publicId, message: 'successfully saved.' } };
+    return { doc: { publicId, message: 'transactions details successfully saved.' } };
   } catch (error) {
-    console.error('Save error:', error.message);
-
-    return { errors: [ { name: 'save', message: 'An error occurred while saving the Transactions data' } ] };
+    return { errors: [{ name: 'save', message: 'An error occurred while saving transactions data' }] };
   }
 };
 
 const getAll = async (payload) => {
-  const { userId } = payload;
+  try {
+    const { userId, customerId } = payload;
 
-  const response = await TransactionsModel.findAll({
-    attributes: { exclude: [ 'id' ] },
-    where: { user_id: userId },
-  });
+    const response = await TransactionsModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
+    });
 
-  if (!response) {
-    return { count: 0, doc: [] };
+    if (!response.length) {
+      return { count: 0, doc: [] };
+    }
+
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
+  } catch (error) {
+    return { errors: [{ name: 'getAll', message: 'An error occurred while fetching transactions data' }] };
   }
-
-  const decryptedDocs = await Promise.all(
-    response.map(async (element) => {
-      const record = Helper.convertSnakeToCamel(element.dataValues);
-
-      const { data: decryptedData, errors: decryptionErrors } = await decryptData(record.encryptedId);
-
-      if (decryptionErrors) {
-        console.error(`Decryption error for encryptedData: ${record.encryptedId}`);
-        record.decryptedData = null;
-      } else {
-        record.decryptedData = decryptedData;
-      }
-
-      delete record.encryptedId;
-
-      return record;
-    }),
-  );
-
-  return { count: decryptedDocs.length, doc: decryptedDocs };
 };
 
-module.exports = { save, getAll };
+const patch = async (payload) => {
+  try {
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
+
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
+
+    const [updatedCount] = await TransactionsModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
+    });
+
+    if (!updatedCount) {
+      return { errors: [{ name: 'patch', message: 'No transactions record found' }] };
+    }
+
+    return { doc: { message: 'transactions details successfully updated.', publicId } };
+  } catch (error) {
+    return { errors: [{ name: 'patch', message: 'An error occurred while updating transactions data' }] };
+  }
+};
+
+const deleted = async (payload) => {
+  try {
+    const { publicId, updatedBy } = payload;
+
+    const [updatedCount] = await TransactionsModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } }
+    );
+
+    if (!updatedCount) {
+      return { errors: [{ name: 'deleted', message: 'No transactions record found' }] };
+    }
+
+    return { doc: { message: 'transactions details successfully deleted.' } };
+  } catch (error) {
+    return { errors: [{ name: 'deleted', message: 'An error occurred while deleting transactions data' }] };
+  }
+};
+
+module.exports = {
+  save, getAll, patch, deleted,
+};

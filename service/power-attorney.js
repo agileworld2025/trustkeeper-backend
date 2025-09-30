@@ -1,177 +1,100 @@
 const { v1: uuidV1 } = require('uuid');
-const { power_attorney: PowerAttorneyModel } = require('../database');
+const { 'power-attorney': PowerAttorneyModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
 
-const save = async (payload) => {
+const encryptionFields = encryptionConfig['power-attorney'] || [];
+
+const save = async (data) => {
   try {
     const publicId = uuidV1();
-    const convertedPayload = camelToSnake(payload);
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
     await PowerAttorneyModel.create({
       public_id: publicId,
-      ...convertedPayload,
+      ...encryptedPayload,
       user_id: convertedPayload.user_id,
       updated_by: convertedPayload.user_id,
       created_by: convertedPayload.user_id,
     });
 
-    return {
-      doc: {
-        publicId,
-        message: 'Power attorney successfully saved.',
-      },
-    };
+    return { doc: { publicId, message: 'power attorney details successfully saved.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'savePowerAttorney',
-          message: 'An error occurred while saving power attorney data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving power attorney data' } ] };
   }
 };
+
 const getAll = async (payload) => {
   try {
-    const { userId } = payload;
+    const { userId, customerId } = payload;
 
-    const powerAttorneyDetails = await PowerAttorneyModel.findAll({
-      where: {
-        user_id: userId,
-        is_deleted: false,
-      },
+    const response = await PowerAttorneyModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
     });
 
-    if (!powerAttorneyDetails.length) {
-      return {
-        errors: [
-          {
-            name: 'getPowerAttorney',
-            message: 'No power attorney details found',
-          },
-        ],
-      };
+    if (!response.length) {
+      return { count: 0, doc: [] };
     }
 
-    return {
-      doc: powerAttorneyDetails,
-    };
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'getPowerAttorney',
-          message: 'An error occurred while fetching power attorney data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching power attorney data' } ] };
   }
 };
-const update = async (payload) => {
-  try {
-    const { publicId, userId, ...body } = payload;
 
-    const convertedPayload = camelToSnake(body);
-    const existingRecord = await PowerAttorneyModel.findOne({
-      where: {
-        public_id: publicId,
-        is_deleted: false,
-      },
+const patch = async (payload) => {
+  try {
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
+
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
+
+    const [ updatedCount ] = await PowerAttorneyModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!existingRecord) {
-      return {
-        errors: [
-          {
-            name: 'updatePowerAttorney',
-            message: 'No record found.',
-          },
-        ],
-      };
+    if (!updatedCount) {
+      return { errors: [ { name: 'patch', message: 'No power attorney record found' } ] };
     }
-    const [ updatedCount ] = await PowerAttorneyModel.update(
-      {
-        ...convertedPayload,
-        updated_by: userId,
-      },
-      {
-        where: {
-          public_id: publicId,
-        },
-      },
-    );
 
-    if (updatedCount) {
-      return {
-        doc: {
-          publicId,
-          message: 'Power attorney successfully updated.',
-        },
-      };
-    }
+    return { doc: { message: 'power attorney details successfully updated.', publicId } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'patchPowerAttorney',
-          message: 'An error occurred while updating power attorney data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating power attorney data' } ] };
   }
 };
 
 const deleted = async (payload) => {
   try {
-    const { publicId } = payload;
-    const isExistingRecord = await PowerAttorneyModel.findOne({
-      where: {
-        public_id: publicId,
-        is_deleted: false,
-      },
-    });
+    const { publicId, updatedBy } = payload;
 
-    if (!isExistingRecord) {
-      return {
-        errors: [
-          {
-            name: 'removePowerAttorney',
-            message: 'Power attorney record not found or already deleted.',
-          },
-        ],
-      };
-    }
-
-    await PowerAttorneyModel.update(
-      {
-        is_deleted: true,
-      },
-      {
-        where: { public_id: publicId },
-      },
+    const [ updatedCount ] = await PowerAttorneyModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
-    return {
-      doc: {
-        message: 'Power attorney successfully deleted.',
-      },
-    };
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No power attorney record found' } ] };
+    }
+
+    return { doc: { message: 'power attorney details successfully deleted.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'removePowerAttorney',
-          message: 'An error occurred while deleting power attorney data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting power attorney data' } ] };
   }
 };
 
 module.exports = {
-  save,
-  getAll,
-  update,
-  deleted,
+  save, getAll, patch, deleted,
 };

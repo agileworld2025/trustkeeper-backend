@@ -1,161 +1,176 @@
-/* eslint-disable no-console */
 const { v1: uuidV1 } = require('uuid');
-const { credit_card: CreditCardModel, sequelize } = require('../database');
-const Helper = require('../utils/helper');
+const { credit_card: CreditCardModel } = require('../database');
+const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decrypt } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
 
-const { encryptData, decryptData } = require('../utils/senitize-data');
+const encryptionFields = encryptionConfig['credit-card'] || [];
 
 const save = async (data) => {
   try {
-    const { doc, errors: encryptionErrors } = await encryptData(data);
-
-    if (encryptionErrors) {
-      return { errors: encryptionErrors };
-    }
-
-    const { encryptDoc } = doc;
-    const { userId } = data;
-
     const publicId = uuidV1();
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+
+    // Store the entire encrypted payload as a single blob
+    const encryptedData = JSON.stringify(encryptedPayload);
 
     await CreditCardModel.create({
-      user_id: userId, public_id: publicId, encrypted_id: encryptDoc, created_by: userId,
+      public_id: publicId,
+      encrypted_id: encryptedData,
+      user_id: convertedPayload.user_id,
+      created_by: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
     });
 
-    return { doc: { publicId, message: 'successfully saved.' } };
+    return { doc: { publicId, message: 'Credit card details successfully saved.' } };
   } catch (error) {
-    console.error('Save error:', error.message);
+    // Log error for debugging
+    // console.error('Credit card save error:', error);
 
-    return { errors: [ { name: 'save', message: 'An error occurred while saving the bank data' } ] };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving credit card data' } ] };
   }
 };
 
 const getAll = async (payload) => {
-  const { userId, customerId } = payload;
+  try {
+    const { userId, customerId } = payload;
 
-  const response = await CreditCardModel.findAll({
-    attributes: { exclude: [ 'id' ] },
-    where: { user_id: customerId || userId, is_deleted: false },
-  });
+    const response = await CreditCardModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
+    });
 
-  if (!response) {
-    return { count: 0, doc: [] };
-  }
+    if (!response.length) {
+      return { count: 0, doc: [] };
+    }
 
-  const decryptedDocs = await Promise.all(
-    response.map(async (element) => {
-      const record = Helper.convertSnakeToCamel(element.dataValues);
+    // Decrypt the stored data
+    const decryptedDocs = response.map((record) => {
+      try {
+        const encryptedData = JSON.parse(record.encrypted_id);
+        const decryptedData = {};
 
-      const { data: decryptedData, errors: decryptionErrors } = await decryptData(record.encryptedId);
+        // Decrypt each field individually
+        Object.keys(encryptedData).forEach((key) => {
+          if (encryptionFields.includes(key)) {
+            // This field was encrypted, so decrypt it
+            decryptedData[key] = decrypt(encryptedData[key]);
+          } else {
+            // This field was not encrypted
+            decryptedData[key] = encryptedData[key];
+          }
+        });
 
-      if (decryptionErrors) {
-        console.error(`Decryption error for encryptedData: ${record.encryptedId}`);
-        record.decryptedData = null;
-      } else {
-        record.decryptedData = decryptedData;
+        return {
+          public_id: record.public_id,
+          user_id: record.user_id,
+          created_by: record.created_by,
+          updated_by: record.updated_by,
+          is_deleted: record.is_deleted,
+          created_at: record.created_at,
+          updated_at: record.updated_at,
+          ...decryptedData,
+        };
+      } catch (error) {
+        // console.error('Error decrypting credit card data:', error);
+
+        return {
+          public_id: record.public_id,
+          user_id: record.user_id,
+          created_by: record.created_by,
+          updated_by: record.updated_by,
+          is_deleted: record.is_deleted,
+          created_at: record.created_at,
+          updated_at: record.updated_at,
+        };
       }
+    });
 
-      delete record.encryptedId;
+    return { count: decryptedDocs.length, doc: decryptedDocs };
+  } catch (error) {
+    // Log error for debugging
+    // console.error('Credit card getAll error:', error);
 
-      return record;
-    }),
-  );
-
-  return { count: decryptedDocs.length, doc: decryptedDocs };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching credit card data' } ] };
+  }
 };
 
 const patch = async (payload) => {
-  const { publicId, updatedBy, ...newDoc } = payload;
-
-  const transaction = await sequelize.transaction();
-
   try {
-    const response = await CreditCardModel.findOne({
-      where: { public_id: publicId },
-      transaction,
-      lock: transaction.LOCK.UPDATE,
+    const { publicId, updatedBy, ...newDoc } = payload;
+
+    // Get existing record
+    const existingRecord = await CreditCardModel.findOne({
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!response) {
-      await transaction.rollback();
-
-      return { errors: [ { name: 'Bank', message: 'No record found.' } ] };
+    if (!existingRecord) {
+      return { errors: [ { name: 'patch', message: 'No credit card record found' } ] };
     }
 
-    const { encrypted_id: encryptedId } = response.dataValues;
-    const { data: decryptedData, errors: decryptionErrors } = await decryptData(encryptedId);
-
-    if (decryptionErrors) {
-      await transaction.rollback();
-
-      return { errors: decryptionErrors };
-    }
-
-    let existingData;
+    // Parse existing encrypted data
+    let existingData = {};
 
     try {
-      existingData = typeof decryptedData.data === 'string'
-        ? JSON.parse(decryptedData.data)
-        : decryptedData.data;
+      existingData = JSON.parse(existingRecord.encrypted_id);
     } catch (error) {
-      await transaction.rollback();
-      console.error('Failed to parse decrypted data:', error);
+      // console.error('Error parsing existing credit card data:', error);
 
-      return { errors: [ { name: 'decryptData', message: 'Invalid decrypted data format.' } ] };
+      return { errors: [ { name: 'patch', message: 'Invalid existing data format' } ] };
     }
 
-    const mergedData = { ...existingData, ...newDoc };
+    // Merge with new data
+    const convertedPayload = camelToSnake(newDoc);
+    const mergedData = { ...existingData, ...convertedPayload };
 
-    const { doc, errors: encryptionErrors } = await encryptData(mergedData);
-    const { encryptDoc } = doc;
+    // Encrypt sensitive fields
+    const encryptedPayload = encryptObject(mergedData, encryptionFields);
+    const encryptedData = JSON.stringify(encryptedPayload);
 
-    if (encryptionErrors) {
-      await transaction.rollback();
-
-      return { errors: encryptionErrors };
-    }
-
-    await CreditCardModel.update(
+    // Update the record
+    const [ updatedCount ] = await CreditCardModel.update(
       {
-        encrypted_id: encryptDoc,
+        encrypted_id: encryptedData,
         updated_by: updatedBy,
       },
-      {
-        where: { public_id: publicId },
-        transaction,
-      },
+      { where: { public_id: publicId, is_deleted: false } },
     );
-    await transaction.commit();
 
-    return { doc: { message: 'Successfully updated.', publicId } };
+    if (!updatedCount) {
+      return { errors: [ { name: 'patch', message: 'No credit card record found' } ] };
+    }
+
+    return { doc: { message: 'Credit card details successfully updated.', publicId } };
   } catch (error) {
-    await transaction.rollback();
-    console.error('Patch error:', error.message);
+    // Log error for debugging
+    // console.error('Credit card patch error:', error);
 
-    return { errors: [ { name: 'patch', message: 'An error occurred while updating the bank data.' } ] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating credit card data' } ] };
   }
 };
 
 const deleted = async (payload) => {
-  const { publicId, updatedBy } = payload;
+  try {
+    const { publicId, updatedBy } = payload;
 
-  const res = await CreditCardModel.findOne({
-    where: { public_id: publicId },
-  });
+    const [ updatedCount ] = await CreditCardModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
+    );
 
-  if (res) {
-    const { dataValues: { is_deleted: isDeleted } } = res;
-
-    if (isDeleted) {
-      return { errors: [ { name: 'publicId', message: 'already deleted!' } ] };
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No credit card record found' } ] };
     }
 
-    await CreditCardModel.update({ is_deleted: true, updated_by: updatedBy }, { where: { public_id: publicId } });
+    return { doc: { message: 'Credit card details successfully deleted.' } };
+  } catch (error) {
+    // Log error for debugging
+    // console.error('Credit card deleted error:', error);
 
-    return { doc: { message: 'successfully deleted!' } };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting credit card data' } ] };
   }
-
-  return { errors: [ { name: 'publicId', message: 'no bank found!' } ] };
 };
 
 module.exports = {

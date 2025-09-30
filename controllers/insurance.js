@@ -1,6 +1,6 @@
 const InsuranceService = require('../service/insurance');
-// const Validator = require('../utils/validator');
-// const { save: saveSchema } = require('../dto-schemas/insurance');
+const Validator = require('../utils/validator');
+const { save: saveSchema, patch: patchSchema } = require('../dto-schemas/insurance');
 
 const validInsuranceTypes = [ 'car-insurance', 'home-insurance', 'travel-insurance', 'business-insurance' ];
 
@@ -28,7 +28,16 @@ const save = async (req, res) => {
 
     const data = { ...body, userId };
 
-    const { doc, errors } = await InsuranceService.save(data);
+    const { errors: validationErrors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...data },
+      schema: saveSchema,
+    });
+
+    if (validationErrors) {
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors: validationErrors });
+    }
+
+    const { doc, errors } = await InsuranceService.save(validatedData);
 
     if (errors) {
       return res.status(400).json({
@@ -93,14 +102,24 @@ const getAll = async (req, res) => {
 
 const patch = async (req, res) => {
   try {
-    const { params: { publicId }, body } = req;
+    const { params: { publicId }, body, auth: { userId } } = req;
 
     const data = {
       ...body,
       publicId,
+      updatedBy: userId,
     };
 
-    const { doc, errors } = await InsuranceService.patch(data);
+    const { errors: validationErrors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...data },
+      schema: patchSchema,
+    });
+
+    if (validationErrors) {
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors: validationErrors });
+    }
+
+    const { doc, errors } = await InsuranceService.patch(validatedData);
 
     if (errors) {
       return res.status(400).json({

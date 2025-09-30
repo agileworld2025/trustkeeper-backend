@@ -1,196 +1,100 @@
 const { v1: uuidV1 } = require('uuid');
-const { legal_advisor: LegalAdvisorModel } = require('../database');
+const { 'legal-advisor': LegalAdvisorModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
 
-const save = async (payload) => {
+const encryptionFields = encryptionConfig['legal-advisor'] || [];
+
+const save = async (data) => {
   try {
     const publicId = uuidV1();
-    const convertedPayload = camelToSnake(payload);
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
     await LegalAdvisorModel.create({
       public_id: publicId,
-      ...convertedPayload,
+      ...encryptedPayload,
       user_id: convertedPayload.user_id,
       updated_by: convertedPayload.user_id,
       created_by: convertedPayload.user_id,
     });
 
-    return {
-      doc: {
-        publicId,
-        message: 'Will LegalAdvisor successfully saved.',
-      },
-    };
+    return { doc: { publicId, message: 'legal advisor details successfully saved.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'saveLegalAdvisorDetails',
-          message: 'An error occurred while saving LegalAdvisor data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving legal advisor data' } ] };
   }
 };
 
 const getAll = async (payload) => {
   try {
-    const { userId } = payload;
+    const { userId, customerId } = payload;
 
-    const legalAdvisorDetails = await LegalAdvisorModel.findAll({
-      where: { user_id: userId },
+    const response = await LegalAdvisorModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
     });
 
-    if (!legalAdvisorDetails.length) {
-      return {
-        errors: [
-          {
-            name: 'saveLegalAdvisorDetails',
-            message: 'No trust details details found',
-          },
-        ],
-      };
+    if (!response.length) {
+      return { count: 0, doc: [] };
     }
 
-    return {
-      doc: legalAdvisorDetails,
-    };
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'legalAdvisor',
-          message: 'An error occurred while fetching will legalAdvisor data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching legal advisor data' } ] };
   }
 };
 
-const update = async (payload) => {
+const patch = async (payload) => {
   try {
-    const {
-      publicId,
-      userId,
-      ...rest
-    } = payload;
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
 
-    const existingDetails = await LegalAdvisorModel.findOne({
-      where: {
-        public_id: publicId,
-      },
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
+
+    const [ updatedCount ] = await LegalAdvisorModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!existingDetails) {
-      return {
-        errors: [
-          {
-            name: 'Not Found',
-            message: 'Data Not Found',
-          },
-        ],
-      };
-    }
-
-    const convertedPayload = camelToSnake(rest);
-
-    const [ updatedCount ] = await LegalAdvisorModel.update(
-      {
-        ...convertedPayload,
-        updated_by: userId,
-
-      },
-      {
-        where: { public_id: publicId },
-      },
-    );
-
     if (!updatedCount) {
-      return {
-        errors: [
-          {
-            name: 'patchTrustDetails',
-            message: 'No will trust details found',
-          },
-        ],
-      };
+      return { errors: [ { name: 'patch', message: 'No legal advisor record found' } ] };
     }
 
-    return {
-      doc: {
-        publicId,
-        message: 'trust details successfully updated.',
-      },
-    };
+    return { doc: { message: 'legal advisor details successfully updated.', publicId } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'trustDetails',
-          message: 'An error occurred while updating will trust data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating legal advisor data' } ] };
   }
 };
 
 const deleted = async (payload) => {
   try {
-    const { publicId, userId } = payload;
+    const { publicId, updatedBy } = payload;
 
-    const existingDetail = await LegalAdvisorModel.findOne({
-      where: { public_id: publicId, user_id: userId, is_deleted: false },
-    });
-
-    if (!existingDetail) {
-      return {
-        errors: [
-          {
-            name: 'deleteLegalAdvisorDetails',
-            message: 'No Legal Advisor details found',
-          },
-        ],
-      };
-    }
-
-    const [ deletedCount ] = await LegalAdvisorModel.update(
-      { is_deleted: true },
-      {
-        where: { public_id: publicId, user_id: userId },
-      },
+    const [ updatedCount ] = await LegalAdvisorModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
-    if (!deletedCount) {
-      return {
-        errors: {
-          message: 'Something Went Wrong.',
-          publicId,
-        },
-      };
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No legal advisor record found' } ] };
     }
 
-    return {
-      doc: {
-        publicId,
-        message: 'Successfully Deleted',
-      },
-
-    };
+    return { doc: { message: 'legal advisor details successfully deleted.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'deleteLegalAdvisorDetails',
-          message: 'An error occurred while deleting Legal Advisor data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting legal advisor data' } ] };
   }
 };
 
 module.exports = {
-  save,
-  getAll,
-  update,
-  deleted,
+  save, getAll, patch, deleted,
 };

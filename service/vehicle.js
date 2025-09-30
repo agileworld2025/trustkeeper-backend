@@ -1,128 +1,98 @@
-/* eslint-disable no-console */
 const { v1: uuidV1 } = require('uuid');
-const { vehicle: VehicleModel, sequelize } = require('../database');
-const Helper = require('../utils/helper');
-const { encryptData } = require('../utils/senitize-data');
+const { vehicle: VehicleModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
+
+const encryptionFields = encryptionConfig.vehicle || [];
 
 const save = async (data) => {
   try {
-    const { errors: encryptionErrors } = await encryptData(data);
-    const convertedData = camelToSnake(data);
-
-    if (encryptionErrors) {
-      return { errors: encryptionErrors };
-    }
     const publicId = uuidV1();
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
     await VehicleModel.create({
       public_id: publicId,
-      ...convertedData,
-      user_id: convertedData.user_id,
-      updated_by: convertedData.user_id,
-      created_by: convertedData.user_id,
+      ...encryptedPayload,
+      user_id: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
+      created_by: convertedPayload.user_id,
     });
 
-    return { doc: { publicId, message: 'successfully saved.' } };
+    return { doc: { publicId, message: 'vehicle details successfully saved.' } };
   } catch (error) {
-    console.error('Save error:', error.message);
-
-    return { errors: [ { name: 'save', message: 'An error occurred while saving the vehicle data' } ] };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving vehicle data' } ] };
   }
 };
 
 const getAll = async (payload) => {
-  const { userId, customerId } = payload;
+  try {
+    const { userId, customerId } = payload;
 
-  const response = await VehicleModel.findAll({
-    attributes: { exclude: [ 'id' ] },
-    where: { user_id: customerId || userId, is_deleted: false },
-  });
+    const response = await VehicleModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
+    });
 
-  if (!response) {
-    return { count: 0, doc: [] };
+    if (!response.length) {
+      return { count: 0, doc: [] };
+    }
+
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
+  } catch (error) {
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching vehicle data' } ] };
   }
-
-  const docs = response.map((element) => {
-    const record = Helper.convertSnakeToCamel(element.dataValues);
-
-    delete record.encryptedId;
-
-    return record;
-  });
-
-  return { count: docs.length, doc: docs };
 };
 
 const patch = async (payload) => {
-  const { publicId, updatedBy, ...newDoc } = payload;
-
-  const transaction = await sequelize.transaction();
-
   try {
-    const response = await VehicleModel.findOne({
-      where: { public_id: publicId },
-      transaction,
-      lock: transaction.LOCK.UPDATE,
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
+
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
+
+    const [ updatedCount ] = await VehicleModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!response) {
-      await transaction.rollback();
-
-      return { errors: [ { name: 'Vehicle', message: 'No record found.' } ] };
+    if (!updatedCount) {
+      return { errors: [ { name: 'patch', message: 'No vehicle record found' } ] };
     }
 
-    const convertedData = camelToSnake(newDoc);
-
-    const { errors: encryptionErrors } = await encryptData(convertedData);
-
-    if (encryptionErrors) {
-      await transaction.rollback();
-
-      return { errors: encryptionErrors };
-    }
-
-    await VehicleModel.update(
-      {
-        ...convertedData,
-        updated_by: updatedBy,
-      },
-      {
-        where: { public_id: publicId },
-        transaction,
-      },
-    );
-
-    await transaction.commit();
-
-    return { doc: { message: 'Successfully updated.', publicId } };
+    return { doc: { message: 'vehicle details successfully updated.', publicId } };
   } catch (error) {
-    await transaction.rollback();
-    console.error('Patch error:', error.message);
-
-    return { errors: [ { name: 'patch', message: 'An error occurred while updating the vehicle data.' } ] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating vehicle data' } ] };
   }
 };
+
 const deleted = async (payload) => {
-  const { publicId, updatedBy } = payload;
+  try {
+    const { publicId, updatedBy } = payload;
 
-  const res = await VehicleModel.findOne({
-    where: { public_id: publicId },
-  });
+    const [ updatedCount ] = await VehicleModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
+    );
 
-  if (res) {
-    const { dataValues: { is_deleted: isDeleted } } = res;
-
-    if (isDeleted) {
-      return { errors: [ { name: 'publicId', message: 'already deleted!' } ] };
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No vehicle record found' } ] };
     }
 
-    await VehicleModel.update({ is_deleted: true, updated_by: updatedBy }, { where: { public_id: publicId } });
-
-    return { doc: { message: 'successfully deleted!' } };
+    return { doc: { message: 'vehicle details successfully deleted.' } };
+  } catch (error) {
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting vehicle data' } ] };
   }
-
-  return { errors: [ { name: 'publicId', message: 'no vehicle record found!' } ] };
 };
 
 module.exports = {

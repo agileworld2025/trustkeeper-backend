@@ -1,164 +1,100 @@
 const { v1: uuidV1 } = require('uuid');
-const { stockMarketDetails: StockMarketDetailsModel } = require('../database');
+const { stocks: StocksModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
 
-const save = async (payload) => {
+const encryptionFields = encryptionConfig.stocks || [];
+
+const save = async (data) => {
   try {
     const publicId = uuidV1();
+    const convertedPayload = camelToSnake(data);
 
-    const {
-      brokerageAccountDetails,
-      country,
-      dematAccountInformation,
-      stockHoldingsWithPurchasePrice,
-      currentValue,
-      userId,
-    } = payload;
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
-    await StockMarketDetailsModel.create({
+    await StocksModel.create({
       public_id: publicId,
-      brokerage_account_details: brokerageAccountDetails,
-      country,
-      demat_account_information: dematAccountInformation,
-      stock_holdings_with_purchase_price: stockHoldingsWithPurchasePrice,
-      current_value: currentValue,
-      created_by: userId,
-      user_id: userId,
-      updated_by: userId,
+      ...encryptedPayload,
+      user_id: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
+      created_by: convertedPayload.user_id,
     });
 
-    return {
-      doc: {
-        publicId,
-        message: 'Stock market details successfully saved.',
-      },
-    };
+    return { doc: { publicId, message: 'stocks details successfully saved.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'saveStockMarket',
-          message: 'An error occurred while saving stock market data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving stocks data' } ] };
   }
 };
 
 const getAll = async (payload) => {
   try {
-    const { userId } = payload;
+    const { userId, customerId } = payload;
 
-    const stockMarketDetails = await StockMarketDetailsModel.findAll({
-      where: { user_id: userId },
+    const response = await StocksModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
     });
 
-    if (!stockMarketDetails.length) {
-      return {
-        errors: [
-          {
-            name: 'getStockMarket',
-            message: 'No stock market data found',
-          },
-        ],
-      };
+    if (!response.length) {
+      return { count: 0, doc: [] };
     }
 
-    return {
-      doc: stockMarketDetails,
-    };
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'getStockMarket',
-          message: 'An error occurred while fetching stock market data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching stocks data' } ] };
   }
 };
 
 const patch = async (payload) => {
   try {
-    const { publicId, body, userId } = payload;
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
 
-    const updateData = camelToSnake(body);
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
 
-    updateData.updated_by = userId;
-
-    const [ updatedCount ] = await StockMarketDetailsModel.update(updateData, {
-      where: { public_id: publicId },
+    const [ updatedCount ] = await StocksModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (updatedCount === 0) {
-      return {
-        errors: [
-          {
-            name: 'updateStockMarket',
-            message: 'No stock market data found to update',
-          },
-        ],
-      };
+    if (!updatedCount) {
+      return { errors: [ { name: 'patch', message: 'No stocks record found' } ] };
     }
 
-    return {
-      doc: {
-        message: 'Stock market details successfully updated.',
-      },
-    };
+    return { doc: { message: 'stocks details successfully updated.', publicId } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'updateStockMarket',
-          message: 'An error occurred while updating stock market data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating stocks data' } ] };
   }
 };
 
 const deleted = async (payload) => {
   try {
-    const { publicId } = payload;
+    const { publicId, updatedBy } = payload;
 
-    const deletedCount = await StockMarketDetailsModel.destroy({
-      where: { public_id: publicId },
-    });
+    const [ updatedCount ] = await StocksModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
+    );
 
-    if (deletedCount === 0) {
-      return {
-        errors: [
-          {
-            name: 'deleteStockMarket',
-            message: 'No stock market data found to delete',
-          },
-        ],
-      };
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No stocks record found' } ] };
     }
 
-    return {
-      doc: {
-        message: 'Stock market details successfully deleted.',
-      },
-    };
+    return { doc: { message: 'stocks details successfully deleted.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'deleteStockMarket',
-          message: 'An error occurred while deleting stock market data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting stocks data' } ] };
   }
 };
 
 module.exports = {
-  save,
-  patch,
-  getAll,
-  deleted,
+  save, getAll, patch, deleted,
 };
-

@@ -1,15 +1,20 @@
 const { v1: uuidV1 } = require('uuid');
 const { social_media: SocialMediaModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const { social_media: encryptionFields } = require('../config/encryption-fields');
 
 const save = async (payload) => {
   try {
     const publicId = uuidV1();
     const convertedPayload = camelToSnake(payload);
 
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+
     await SocialMediaModel.create({
       public_id: publicId,
-      ...convertedPayload,
+      ...encryptedPayload,
       user_id: convertedPayload.user_id,
       updated_by: convertedPayload.user_id,
       created_by: convertedPayload.user_id,
@@ -35,12 +40,12 @@ const save = async (payload) => {
 
 const getAll = async (payload) => {
   try {
-    const { userId } = payload;
+    const { userId, customerId } = payload;
 
     const socialMediaDetails = await SocialMediaModel.findAll({
-      where: { 
-        user_id: userId,
-        is_deleted: false
+      where: {
+        user_id: customerId || userId,
+        is_deleted: false,
       },
     });
 
@@ -55,8 +60,12 @@ const getAll = async (payload) => {
       };
     }
 
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = socialMediaDetails.map((r) => r.get({ plain: true }));
+    const decryptedDetails = decryptArray(plainRecords, encryptionFields);
+
     return {
-      doc: socialMediaDetails,
+      doc: decryptedDetails,
     };
   } catch (error) {
     return {
@@ -70,104 +79,54 @@ const getAll = async (payload) => {
   }
 };
 
-const update = async (payload) => {
+const patch = async (payload) => {
   try {
-    const {
-      publicId,
-      userId,
-      ...rest
-    } = payload;
-    const convertedPayload = camelToSnake(rest);
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
+
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
     const updateData = {
-      ...convertedPayload,
-      updated_by: userId,
+      ...encryptedPayload,
+      updated_by: updatedBy,
     };
 
     const [ updatedCount ] = await SocialMediaModel.update(updateData, {
-      where: { 
-        public_id: publicId,
-        is_deleted: false
-      },
+      where: { public_id: publicId, is_deleted: false },
     });
 
     if (!updatedCount) {
-      return {
-        errors: [
-          {
-            name: 'patchSocialMedia',
-            message: 'No social media details found',
-          },
-        ],
-      };
+      return { errors: [ { name: 'patch', message: 'No social media record found' } ] };
     }
 
-    return {
-      doc: {
-        publicId,
-        message: 'Social media details successfully updated.',
-      },
-    };
+    return { doc: { message: 'Social media details successfully updated.', publicId } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'patchSocialMedia',
-          message: 'An error occurred while updating social media data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating social media data' } ] };
   }
 };
 
 const deleted = async (payload) => {
   try {
-    const { publicId, userId } = payload;
+    const { publicId, updatedBy } = payload;
 
     const [ updatedCount ] = await SocialMediaModel.update(
-      { 
-        is_deleted: true,
-        updated_by: userId
-      },
-      {
-        where: { 
-          public_id: publicId, 
-          user_id: userId,
-          is_deleted: false
-        },
-      }
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
     if (!updatedCount) {
-      return {
-        errors: [
-          {
-            name: 'deleteSocialMedia',
-            message: 'No social media details found',
-          },
-        ],
-      };
+      return { errors: [ { name: 'deleted', message: 'No social media record found' } ] };
     }
 
-    return {
-      doc: {
-        message: 'Social media details successfully deleted.',
-      },
-    };
+    return { doc: { message: 'Social media details successfully deleted.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'deleteSocialMedia',
-          message: 'An error occurred while deleting social media data',
-        },
-      ],
-    };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting social media data' } ] };
   }
 };
 
 module.exports = {
   save,
   getAll,
-  update,
+  patch,
   deleted,
 };

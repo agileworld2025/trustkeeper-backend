@@ -1,112 +1,99 @@
-/* eslint-disable no-console */
 const { v1: uuidV1 } = require('uuid');
-const { business_ownership: BusinessOwnershipModel, sequelize } = require('../database');
-const Helper = require('../utils/helper');
+const { business_ownership: BusinessOwnershipModel } = require('../database');
+const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
+
+const encryptionFields = encryptionConfig['business-ownership'] || [];
 
 const save = async (data) => {
   try {
-    const convertedData = Helper.camelToSnake(data);
     const publicId = uuidV1();
+    const convertedPayload = camelToSnake(data);
+
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
     await BusinessOwnershipModel.create({
       public_id: publicId,
-      ...convertedData,
-      user_id: convertedData.user_id,
-      updated_by: convertedData.user_id,
-      created_by: convertedData.user_id,
+      ...encryptedPayload,
+      user_id: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
+      created_by: convertedPayload.user_id,
     });
 
-    return { doc: { publicId, message: 'successfully saved.' } };
+    return { doc: { publicId, message: 'business ownership details successfully saved.' } };
   } catch (error) {
-    console.error('Save error:', error.message);
-
-    return { errors: [ { name: 'save', message: 'An error occurred while saving the business ownership data' } ] };
+    // console.error('Business ownership save error:', error);
+    return { errors: [ { name: 'save', message: 'An error occurred while saving business ownership data' } ] };
   }
 };
 
 const getAll = async (payload) => {
-  const { userId, customerId } = payload;
+  try {
+    const { userId, customerId } = payload;
 
-  const response = await BusinessOwnershipModel.findAll({
-    attributes: { exclude: [ 'id' ] },
-    where: { user_id: customerId || userId, is_deleted: false },
-  });
+    const response = await BusinessOwnershipModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
+    });
 
-  if (!response) {
-    return { count: 0, doc: [] };
+    if (!response.length) {
+      return { count: 0, doc: [] };
+    }
+
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
+  } catch (error) {
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching business ownership data' } ] };
   }
-
-  const docs = response.map((element) => {
-    const record = Helper.convertSnakeToCamel(element.dataValues);
-
-    return record;
-  });
-
-  return { count: docs.length, doc: docs };
 };
 
 const patch = async (payload) => {
-  const { publicId, updatedBy, ...newDoc } = payload;
-
-  const transaction = await sequelize.transaction();
-
   try {
-    const response = await BusinessOwnershipModel.findOne({
-      where: { public_id: publicId },
-      transaction,
-      lock: transaction.LOCK.UPDATE,
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
+
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
+    };
+
+    const [ updatedCount ] = await BusinessOwnershipModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!response) {
-      await transaction.rollback();
-
-      return { errors: [ { name: 'BusinessOwnership', message: 'No record found.' } ] };
+    if (!updatedCount) {
+      return { errors: [ { name: 'patch', message: 'No business ownership record found' } ] };
     }
 
-    const convertedData = Helper.camelToSnake(newDoc);
-
-    await BusinessOwnershipModel.update(
-      {
-        ...convertedData,
-        updated_by: updatedBy,
-      },
-      {
-        where: { public_id: publicId },
-        transaction,
-      },
-    );
-
-    await transaction.commit();
-
-    return { doc: { message: 'Successfully updated.', publicId } };
+    return { doc: { message: 'business ownership details successfully updated.', publicId } };
   } catch (error) {
-    await transaction.rollback();
-    console.error('Patch error:', error.message);
-
-    return { errors: [ { name: 'patch', message: 'An error occurred while updating the business ownership data.' } ] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating business ownership data' } ] };
   }
 };
 
 const deleted = async (payload) => {
-  const { publicId, updatedBy } = payload;
+  try {
+    const { publicId, updatedBy } = payload;
 
-  const res = await BusinessOwnershipModel.findOne({
-    where: { public_id: publicId },
-  });
+    const [ updatedCount ] = await BusinessOwnershipModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } },
+    );
 
-  if (res) {
-    const { dataValues: { is_deleted: isDeleted } } = res;
-
-    if (isDeleted) {
-      return { errors: [ { name: 'publicId', message: 'already deleted!' } ] };
+    if (!updatedCount) {
+      return { errors: [ { name: 'deleted', message: 'No business ownership record found' } ] };
     }
 
-    await BusinessOwnershipModel.update({ is_deleted: true, updated_by: updatedBy }, { where: { public_id: publicId } });
-
-    return { doc: { message: 'successfully deleted!' } };
+    return { doc: { message: 'business ownership details successfully deleted.' } };
+  } catch (error) {
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting business ownership data' } ] };
   }
-
-  return { errors: [ { name: 'publicId', message: 'no business ownership found!' } ] };
 };
 
 module.exports = {

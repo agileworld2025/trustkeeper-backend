@@ -1,171 +1,100 @@
 const { v1: uuidV1 } = require('uuid');
-const { cryptocurrency_details: CryptoDetailsModel } = require('../database');
-
+const { cryptocurrency_details: CryptoModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
+const { encryptObject, decryptArray } = require('../utils/encryption');
+const encryptionConfig = require('../config/encryption-fields');
+const encryptionFields = encryptionConfig['crypto'] || [];
 
-const save = async (payload) => {
+const save = async (data) => {
   try {
     const publicId = uuidV1();
-    const { userId, ...rest } = payload;
+    const convertedPayload = camelToSnake(data);
 
-    const postData = camelToSnake(rest);
-    const checkDuplicate = await CryptoDetailsModel.findOne({
-      where: {
-        private_keys: postData.private_keys,
-      },
-    });
+    // Encrypt sensitive fields before saving to database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
 
-    if (checkDuplicate) {
-      return {
-        errors: [
-          {
-            name: 'saveCryptoDetails',
-            message: 'Private keys already exist, edit the existing record',
-          },
-        ],
-      };
-    }
-
-    await CryptoDetailsModel.create({
+    await CryptoModel.create({
       public_id: publicId,
-      user_id: userId,
-      created_by: userId,
-      updated_by: userId,
-      ...postData,
+      ...encryptedPayload,
+      user_id: convertedPayload.user_id,
+      updated_by: convertedPayload.user_id,
+      created_by: convertedPayload.user_id,
     });
 
-    return {
-      doc: {
-        user_id: userId,
-        publicId,
-        message: 'Crypto details successfully saved.',
-      },
-    };
+    return { doc: { publicId, message: 'crypto details successfully saved.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'saveCryptoDetails',
-          message: 'An error occurred while saving crypto data',
-        },
-      ],
-    };
+    console.error('Crypto save error:', error);
+    return { errors: [{ name: 'save', message: 'An error occurred while saving crypto data' }] };
   }
 };
 
-const getAll = async (userId) => {
+const getAll = async (payload) => {
   try {
-    const data = await CryptoDetailsModel.findAll({
-      where: {
-        user_id: userId,
-        isDeleted: false,
-      },
+    const { userId, customerId } = payload;
+
+    const response = await CryptoModel.findAll({
+      where: { user_id: customerId || userId, is_deleted: false },
     });
 
-    return {
-      doc: data,
-    };
+    if (!response.length) {
+      return { count: 0, doc: [] };
+    }
+
+    // Convert to plain objects and decrypt sensitive fields before returning to user
+    const plainRecords = response.map((r) => r.get({ plain: true }));
+    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+
+    return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'getAllCryptoDetails',
-          message: 'An error occurred while retrieving crypto data',
-        },
-      ],
-    };
+    return { errors: [{ name: 'getAll', message: 'An error occurred while fetching crypto data' }] };
   }
 };
 
 const patch = async (payload) => {
   try {
-    const { userId, ...rest } = payload;
+    const { publicId, updatedBy, ...newDoc } = payload;
+    const convertedPayload = camelToSnake(newDoc);
 
-    const postData = camelToSnake(rest);
-
-    await CryptoDetailsModel.update(
-      {
-        ...postData,
-        updated_by: userId,
-      },
-      {
-        where: {
-          public_id: postData.public_id,
-        },
-      },
-    );
-
-    return {
-      doc: {
-        user_id: userId,
-        publicId: postData.public_id,
-        message: 'Crypto details successfully updated.',
-      },
+    // Encrypt sensitive fields before updating in database
+    const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const updateData = {
+      ...encryptedPayload,
+      updated_by: updatedBy,
     };
-  } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'patchCryptoDetails',
-          message: 'An error occurred while updating crypto data',
-        },
-      ],
-    };
-  }
-};
-const deleted = async (payload) => {
-  try {
-    const { userId, publicId } = payload;
-    const checkData = await CryptoDetailsModel.findOne({
-      where: {
-        public_id: publicId,
-        isDeleted: false,
-      },
+
+    const [updatedCount] = await CryptoModel.update(updateData, {
+      where: { public_id: publicId, is_deleted: false },
     });
 
-    if (!checkData) {
-      return {
-        errors: [
-          {
-            name: 'deleteCryptoDetails',
-            message: 'Crypto details not found or already deleted',
-          },
-        ],
-      };
+    if (!updatedCount) {
+      return { errors: [{ name: 'patch', message: 'No crypto record found' }] };
     }
 
-    await CryptoDetailsModel.update(
-      {
-        isDeleted: true,
-        updated_by: userId,
-      },
-      {
-        where: {
-          public_id: publicId,
-        },
-      },
+    return { doc: { message: 'crypto details successfully updated.', publicId } };
+  } catch (error) {
+    return { errors: [{ name: 'patch', message: 'An error occurred while updating crypto data' }] };
+  }
+};
+
+const deleted = async (payload) => {
+  try {
+    const { publicId, updatedBy } = payload;
+
+    const [updatedCount] = await CryptoModel.update(
+      { is_deleted: true, updated_by: updatedBy },
+      { where: { public_id: publicId, is_deleted: false } }
     );
 
-    return {
-      doc: {
-        message: 'Crypto details successfully deleted.',
-      },
-    };
+    if (!updatedCount) {
+      return { errors: [{ name: 'deleted', message: 'No crypto record found' }] };
+    }
+
+    return { doc: { message: 'crypto details successfully deleted.' } };
   } catch (error) {
-    return {
-      errors: [
-        {
-          name: 'deleteCryptoDetails',
-          message: 'An error occurred while deleting crypto data',
-        },
-      ],
-    };
+    return { errors: [{ name: 'deleted', message: 'An error occurred while deleting crypto data' }] };
   }
 };
 
 module.exports = {
-  save,
-  getAll,
-  patch,
-  deleted,
+  save, getAll, patch, deleted,
 };

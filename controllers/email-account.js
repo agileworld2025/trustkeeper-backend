@@ -1,4 +1,6 @@
 const EmailAccountService = require('../service/email-account');
+const Validator = require('../utils/validator');
+const { patch: patchSchema, save: saveSchema } = require('../dto-schemas/email-account/index');
 
 const save = async (req, res) => {
   try {
@@ -13,7 +15,16 @@ const save = async (req, res) => {
 
     const data = { ...body, userId };
 
-    const { doc, errors } = await EmailAccountService.save(data);
+    const { errors: validationErrors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...data },
+      schema: saveSchema,
+    });
+
+    if (validationErrors) {
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors: validationErrors });
+    }
+
+    const { doc, errors } = await EmailAccountService.save(validatedData);
 
     if (errors) {
       return res.status(400).json({
@@ -84,9 +95,18 @@ const update = async (req, res) => {
       });
     }
 
-    const data = { ...body, userId, publicId };
+    const data = { ...body, updatedBy: userId, publicId };
 
-    const { doc, errors } = await EmailAccountService.update(data);
+    const { errors: validationErrors, data: validatedData } = Validator.isSchemaValid({
+      data: { ...data },
+      schema: patchSchema,
+    });
+
+    if (validationErrors) {
+      return res.status(400).json({ status: 'error', message: 'Field validation failed', errors: validationErrors });
+    }
+
+    const { doc, errors } = await EmailAccountService.patch(validatedData);
 
     if (errors) {
       return res.status(400).json({
@@ -116,7 +136,7 @@ const deleted = async (req, res) => {
       });
     }
 
-    const data = { userId, publicId };
+    const data = { updatedBy: userId, publicId };
 
     const { doc, errors } = await EmailAccountService.deleted(data);
 
