@@ -1,4 +1,19 @@
 module.exports = {
+  cloud_storage: [
+    'google_drive_username',
+    'google_drive_password',
+    'onedrive_username',
+    'onedrive_password',
+    'icloud_username',
+    'icloud_password',
+    'dropbox_username',
+    'dropbox_password',
+    'cloud_storage_username_1',
+    'cloud_storage_password_1',
+    'cloud_storage_username_2',
+    'cloud_storage_password_2',
+    'country',
+  ],
   social_media: [
     'facebook_username',
     'facebook_password',
