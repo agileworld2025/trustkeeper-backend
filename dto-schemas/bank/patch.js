@@ -7,79 +7,46 @@ const patch = {
       type: 'string',
       format: 'uuid',
     },
-    name: {
+    bank_name: {
       type: 'string',
       description: 'Name of the bank',
     },
-    code: {
+    account_number: {
       type: 'string',
-      description: 'Bank code',
+      description: 'Account number of the user\'s bank',
     },
-    accountNumber: {
+    account_holder: {
       type: 'string',
-      description: 'Account number of the user’s bank',
+      description: 'Account holder name',
     },
-    branch: {
+    account_type: {
       type: 'string',
-      description: 'Branch of the user’s bank',
+      description: 'Type of bank account (Savings, Current, etc.)',
     },
-    nominees: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: [ 'name' ],
-        properties: {
-          name: {
-            type: 'string',
-            description: 'Nominee’s name',
-          },
-          mobileNumber: {
-            type: 'string',
-            description: 'Nominee’s mobile number',
-          },
-          dob: {
-            type: [ 'string', 'null' ],
-            description: 'Date of birth of the nominee',
-            oneOf: [
-              {
-                format: 'date',
-              },
-            ],
-          },
-          email: {
-            type: [ 'string', 'null' ],
-            format: 'email',
-            maxLength: 50,
-            minLength: 2,
-            transform: [ 'trim', 'toLowerCase' ],
-            description: 'Nominee’s email address',
-          },
-          relationship: {
-            type: 'string',
-            description: 'Relationship to the account holder',
-          },
-        },
-      },
-    },
-    ownerName: {
-      type: 'string',
-      description: 'Owner name of the user’s bank account',
-    },
-    ifsc: {
+    ifsc_code: {
       type: 'string',
       description: 'IFSC code of the bank',
     },
-    currency: {
+    branch: {
       type: 'string',
-      description: 'Currency of the account',
+      description: 'Branch of the user\'s bank',
+    },
+    phone_number: {
+      type: 'string',
+      description: 'Phone number associated with the account',
     },
     country: {
       type: 'string',
       description: 'Country where the bank is located',
     },
-    info: {
-      type: 'object',
-      description: 'Additional information',
+    currency: {
+      type: 'string',
+      description: 'Currency of the account',
+    },
+    document_path: {
+      type: 'string',
+      description: 'Path to uploaded document',
+      nullable: true,
     },
     updatedBy: {
       type: 'string',

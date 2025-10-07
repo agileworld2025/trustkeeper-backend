@@ -1,5 +1,5 @@
 const { v1: uuidV1 } = require('uuid');
-const { 'fixed-deposit': FixedDepositModel } = require('../database');
+const { fixed_deposits: FixedDepositModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const encryptionConfig = require('../config/encryption-fields');
@@ -9,7 +9,13 @@ const encryptionFields = encryptionConfig['fixed-deposit'] || [];
 const save = async (data) => {
   try {
     const publicId = uuidV1();
-    const convertedPayload = camelToSnake(data);
+    // Normalize incoming keys to match DB columns before encryption
+    const normalized = {
+      ...data,
+      // Common front-end names mapped to backend columns
+      fdNumber: data.fdNumber || data.depositNumber || data.fd_number || data.deposit_number,
+    };
+    const convertedPayload = camelToSnake(normalized);
 
     // Encrypt sensitive fields before saving to database
     const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
@@ -53,7 +59,11 @@ const getAll = async (payload) => {
 const patch = async (payload) => {
   try {
     const { publicId, updatedBy, ...newDoc } = payload;
-    const convertedPayload = camelToSnake(newDoc);
+    const normalized = {
+      ...newDoc,
+      fdNumber: newDoc.fdNumber || newDoc.depositNumber || newDoc.fd_number || newDoc.deposit_number,
+    };
+    const convertedPayload = camelToSnake(normalized);
 
     // Encrypt sensitive fields before updating in database
     const encryptedPayload = encryptObject(convertedPayload, encryptionFields);

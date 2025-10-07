@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { ENCRYPTION } = require('../config');
 
 /**
  * Encryption configuration
@@ -15,7 +16,7 @@ const ENCRYPTED_POSITION = TAG_POSITION + TAG_LENGTH;
  * @returns {string} Encryption key
  */
 function getEncryptionKey() {
-  const key = process.env.ENCRYPTION_KEY;
+  const key = process.env.ENCRYPTION_KEY || ENCRYPTION.KEY;
 
   if (!key) {
     throw new Error('ENCRYPTION_KEY environment variable is not set');

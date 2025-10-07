@@ -3,6 +3,7 @@ const { term_insurance: TermInsuranceModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const encryptionConfig = require('../config/encryption-fields');
+
 const encryptionFields = encryptionConfig['term-insurance'] || [];
 
 const save = async (data) => {
@@ -26,8 +27,7 @@ const save = async (data) => {
 
     return { doc: { publicId, message: 'term insurance details successfully saved.' } };
   } catch (error) {
-    console.error('Term insurance save error:', error);
-    return { errors: [{ name: 'save', message: 'An error occurred while saving term insurance data' }] };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving term insurance data' } ] };
   }
 };
 
@@ -49,7 +49,7 @@ const getAll = async (payload) => {
 
     return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return { errors: [{ name: 'getAll', message: 'An error occurred while fetching term insurance data' }] };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching term insurance data' } ] };
   }
 };
 
@@ -65,17 +65,17 @@ const patch = async (payload) => {
       updated_by: updatedBy,
     };
 
-    const [updatedCount] = await TermInsuranceModel.update(updateData, {
+    const [ updatedCount ] = await TermInsuranceModel.update(updateData, {
       where: { public_id: publicId, is_deleted: false },
     });
 
     if (!updatedCount) {
-      return { errors: [{ name: 'patch', message: 'No term insurance record found' }] };
+      return { errors: [ { name: 'patch', message: 'No term insurance record found' } ] };
     }
 
     return { doc: { message: 'term insurance details successfully updated.', publicId } };
   } catch (error) {
-    return { errors: [{ name: 'patch', message: 'An error occurred while updating term insurance data' }] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating term insurance data' } ] };
   }
 };
 
@@ -83,18 +83,18 @@ const deleted = async (payload) => {
   try {
     const { publicId, updatedBy } = payload;
 
-    const [updatedCount] = await TermInsuranceModel.update(
+    const [ updatedCount ] = await TermInsuranceModel.update(
       { is_deleted: true, updated_by: updatedBy },
-      { where: { public_id: publicId, is_deleted: false } }
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
     if (!updatedCount) {
-      return { errors: [{ name: 'deleted', message: 'No term insurance record found' }] };
+      return { errors: [ { name: 'deleted', message: 'No term insurance record found' } ] };
     }
 
     return { doc: { message: 'term insurance details successfully deleted.' } };
   } catch (error) {
-    return { errors: [{ name: 'deleted', message: 'An error occurred while deleting term insurance data' }] };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting term insurance data' } ] };
   }
 };
 

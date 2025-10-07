@@ -2,29 +2,41 @@ const { v1: uuidV1 } = require('uuid');
 const { lic: LicModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
-const encryptionConfig = require('../config/encryption-fields');
+const { lic: encryptionFields } = require('../config/encryption-fields');
 
-const encryptionFields = encryptionConfig.lic || [];
-
-const save = async (data) => {
+const save = async (payload) => {
   try {
     const publicId = uuidV1();
-    const convertedPayload = camelToSnake(data);
+    const convertedPayload = camelToSnake(payload);
 
-    // Encrypt sensitive fields before saving to database
     const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+    const encryptedData = JSON.stringify(encryptedPayload);
+    const userId = convertedPayload.user_id || payload.userId;
 
     await LicModel.create({
       public_id: publicId,
+      encrypted_id: encryptedData,
       ...encryptedPayload,
-      user_id: convertedPayload.user_id,
-      updated_by: convertedPayload.user_id,
-      created_by: convertedPayload.user_id,
+      user_id: userId,
+      updated_by: userId,
+      created_by: userId,
     });
 
-    return { doc: { publicId, message: 'lic details successfully saved.' } };
+    return {
+      doc: {
+        publicId,
+        message: 'LIC details successfully saved.',
+      },
+    };
   } catch (error) {
-    return { errors: [ { name: 'save', message: 'An error occurred while saving lic data' } ] };
+    return {
+      errors: [
+        {
+          name: 'saveLic',
+          message: 'An error occurred while saving LIC data',
+        },
+      ],
+    };
   }
 };
 
@@ -32,21 +44,49 @@ const getAll = async (payload) => {
   try {
     const { userId, customerId } = payload;
 
-    const response = await LicModel.findAll({
-      where: { user_id: customerId || userId, is_deleted: false },
+    const licDetails = await LicModel.findAll({
+      where: {
+        user_id: customerId || userId,
+        is_deleted: false,
+      },
     });
 
-    if (!response.length) {
-      return { count: 0, doc: [] };
+    if (!licDetails.length) {
+      return {
+        errors: [
+          {
+            name: 'getLic',
+            message: 'No LIC details found',
+          },
+        ],
+      };
     }
 
-    // Convert to plain objects and decrypt sensitive fields before returning to user
-    const plainRecords = response.map((r) => r.get({ plain: true }));
-    const decryptedDocs = decryptArray(plainRecords, encryptionFields);
+    const plainRecords = licDetails.map((r) => {
+      const record = r.get({ plain: true });
 
-    return { count: decryptedDocs.length, doc: decryptedDocs };
+      if (record.encrypted_id) {
+        const decryptedData = JSON.parse(record.encrypted_id);
+
+        return { ...record, ...decryptedData };
+      }
+
+      return record;
+    });
+    const decryptedDetails = decryptArray(plainRecords, encryptionFields);
+
+    return {
+      doc: decryptedDetails,
+    };
   } catch (error) {
-    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching lic data' } ] };
+    return {
+      errors: [
+        {
+          name: 'getLic',
+          message: 'An error occurred while fetching LIC data',
+        },
+      ],
+    };
   }
 };
 
@@ -55,9 +95,12 @@ const patch = async (payload) => {
     const { publicId, updatedBy, ...newDoc } = payload;
     const convertedPayload = camelToSnake(newDoc);
 
-    // Encrypt sensitive fields before updating in database
     const encryptedPayload = encryptObject(convertedPayload, encryptionFields);
+
+    const encryptedData = JSON.stringify(encryptedPayload);
+
     const updateData = {
+      encrypted_id: encryptedData,
       ...encryptedPayload,
       updated_by: updatedBy,
     };
@@ -67,12 +110,12 @@ const patch = async (payload) => {
     });
 
     if (!updatedCount) {
-      return { errors: [ { name: 'patch', message: 'No lic record found' } ] };
+      return { errors: [ { name: 'patch', message: 'No LIC record found' } ] };
     }
 
-    return { doc: { message: 'lic details successfully updated.', publicId } };
+    return { doc: { message: 'LIC details successfully updated.', publicId } };
   } catch (error) {
-    return { errors: [ { name: 'patch', message: 'An error occurred while updating lic data' } ] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating LIC data' } ] };
   }
 };
 
@@ -86,12 +129,12 @@ const deleted = async (payload) => {
     );
 
     if (!updatedCount) {
-      return { errors: [ { name: 'deleted', message: 'No lic record found' } ] };
+      return { errors: [ { name: 'deleted', message: 'No LIC record found' } ] };
     }
 
-    return { doc: { message: 'lic details successfully deleted.' } };
+    return { doc: { message: 'LIC details successfully deleted.' } };
   } catch (error) {
-    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting lic data' } ] };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting LIC data' } ] };
   }
 };
 

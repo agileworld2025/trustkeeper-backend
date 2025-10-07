@@ -3,7 +3,8 @@ const { trust: TrustModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const encryptionConfig = require('../config/encryption-fields');
-const encryptionFields = encryptionConfig['trust'] || [];
+
+const encryptionFields = encryptionConfig.trust || [];
 
 const save = async (data) => {
   try {
@@ -23,7 +24,7 @@ const save = async (data) => {
 
     return { doc: { publicId, message: 'trust details successfully saved.' } };
   } catch (error) {
-    return { errors: [{ name: 'save', message: 'An error occurred while saving trust data' }] };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving trust data' } ] };
   }
 };
 
@@ -45,7 +46,7 @@ const getAll = async (payload) => {
 
     return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return { errors: [{ name: 'getAll', message: 'An error occurred while fetching trust data' }] };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching trust data' } ] };
   }
 };
 
@@ -61,17 +62,17 @@ const patch = async (payload) => {
       updated_by: updatedBy,
     };
 
-    const [updatedCount] = await TrustModel.update(updateData, {
+    const [ updatedCount ] = await TrustModel.update(updateData, {
       where: { public_id: publicId, is_deleted: false },
     });
 
     if (!updatedCount) {
-      return { errors: [{ name: 'patch', message: 'No trust record found' }] };
+      return { errors: [ { name: 'patch', message: 'No trust record found' } ] };
     }
 
     return { doc: { message: 'trust details successfully updated.', publicId } };
   } catch (error) {
-    return { errors: [{ name: 'patch', message: 'An error occurred while updating trust data' }] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating trust data' } ] };
   }
 };
 
@@ -79,18 +80,18 @@ const deleted = async (payload) => {
   try {
     const { publicId, updatedBy } = payload;
 
-    const [updatedCount] = await TrustModel.update(
+    const [ updatedCount ] = await TrustModel.update(
       { is_deleted: true, updated_by: updatedBy },
-      { where: { public_id: publicId, is_deleted: false } }
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
     if (!updatedCount) {
-      return { errors: [{ name: 'deleted', message: 'No trust record found' }] };
+      return { errors: [ { name: 'deleted', message: 'No trust record found' } ] };
     }
 
     return { doc: { message: 'trust details successfully deleted.' } };
   } catch (error) {
-    return { errors: [{ name: 'deleted', message: 'An error occurred while deleting trust data' }] };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting trust data' } ] };
   }
 };
 

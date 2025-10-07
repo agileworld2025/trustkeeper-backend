@@ -3,7 +3,8 @@ const { cryptocurrency_details: CryptoModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const encryptionConfig = require('../config/encryption-fields');
-const encryptionFields = encryptionConfig['crypto'] || [];
+
+const encryptionFields = encryptionConfig.crypto || [];
 
 const save = async (data) => {
   try {
@@ -23,8 +24,7 @@ const save = async (data) => {
 
     return { doc: { publicId, message: 'crypto details successfully saved.' } };
   } catch (error) {
-    console.error('Crypto save error:', error);
-    return { errors: [{ name: 'save', message: 'An error occurred while saving crypto data' }] };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving crypto data' } ] };
   }
 };
 
@@ -46,7 +46,7 @@ const getAll = async (payload) => {
 
     return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return { errors: [{ name: 'getAll', message: 'An error occurred while fetching crypto data' }] };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching crypto data' } ] };
   }
 };
 
@@ -62,17 +62,17 @@ const patch = async (payload) => {
       updated_by: updatedBy,
     };
 
-    const [updatedCount] = await CryptoModel.update(updateData, {
+    const [ updatedCount ] = await CryptoModel.update(updateData, {
       where: { public_id: publicId, is_deleted: false },
     });
 
     if (!updatedCount) {
-      return { errors: [{ name: 'patch', message: 'No crypto record found' }] };
+      return { errors: [ { name: 'patch', message: 'No crypto record found' } ] };
     }
 
     return { doc: { message: 'crypto details successfully updated.', publicId } };
   } catch (error) {
-    return { errors: [{ name: 'patch', message: 'An error occurred while updating crypto data' }] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating crypto data' } ] };
   }
 };
 
@@ -80,18 +80,18 @@ const deleted = async (payload) => {
   try {
     const { publicId, updatedBy } = payload;
 
-    const [updatedCount] = await CryptoModel.update(
+    const [ updatedCount ] = await CryptoModel.update(
       { is_deleted: true, updated_by: updatedBy },
-      { where: { public_id: publicId, is_deleted: false } }
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
     if (!updatedCount) {
-      return { errors: [{ name: 'deleted', message: 'No crypto record found' }] };
+      return { errors: [ { name: 'deleted', message: 'No crypto record found' } ] };
     }
 
     return { doc: { message: 'crypto details successfully deleted.' } };
   } catch (error) {
-    return { errors: [{ name: 'deleted', message: 'An error occurred while deleting crypto data' }] };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting crypto data' } ] };
   }
 };
 

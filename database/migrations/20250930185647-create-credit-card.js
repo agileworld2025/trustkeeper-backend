@@ -1,6 +1,6 @@
 /* eslint-disable filenames/match-regex */
 module.exports = {
-  up: (queryInterface, DataTypes) => queryInterface.createTable('bank', {
+  up: (queryInterface, DataTypes) => queryInterface.createTable('credit_card', {
     id: {
       allowNull: false,
       autoIncrement: true,
@@ -16,54 +16,48 @@ module.exports = {
       type: DataTypes.UUID,
       allowNull: false,
     },
-    encrypted_id: {
+    card_number: {
       type: DataTypes.TEXT,
       allowNull: false,
     },
-
-    account_number: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-    account_holder: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-    },
-    account_type: {
+    card_holder_name: {
       type: DataTypes.TEXT,
       allowNull: false,
     },
     bank_name: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
-    ifsc_code: {
+    upload_credit_card: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
-    branch: {
+    expiry_date: {
       type: DataTypes.TEXT,
-    },
-    phone_number: {
-      type: DataTypes.TEXT,
+      allowNull: true,
     },
     country: {
       type: DataTypes.TEXT,
+      allowNull: true,
     },
-    currency: {
+    branch: {
       type: DataTypes.TEXT,
-      defaultValue: 'US Dollar',
+      allowNull: true,
     },
-    document_path: {
+    available_balance: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    created_by: {
+      type: DataTypes.UUID,
+    },
+    updated_by: {
+      type: DataTypes.UUID,
     },
     is_deleted: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
-
-    created_by: { type: DataTypes.UUID },
-    updated_by: { type: DataTypes.UUID },
     created_at: {
       allowNull: false,
       type: DataTypes.DATE,
@@ -76,5 +70,5 @@ module.exports = {
     },
   }),
 
-  down: (queryInterface) => queryInterface.dropTable('bank'),
+  down: (queryInterface) => queryInterface.dropTable('credit_card'),
 };

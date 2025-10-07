@@ -1,47 +1,44 @@
 const patch = {
-  title: 'patch credit card',
-  description: 'Schema for edit bank details including card information',
+  title: 'Patch Credit Card Details',
+  description: 'Schema for updating credit card information',
   type: 'object',
   properties: {
     publicId: {
       type: 'string',
       format: 'uuid',
     },
-    bankName: {
+    card_number: {
       type: 'string',
-      description: 'Name of the bank',
+      description: 'Credit card number',
     },
-    cardNumber: {
+    card_holder_name: {
       type: 'string',
-      description: 'Credit or debit card number associated with the account',
+      description: 'Name of the card holder',
     },
-    branch: {
+    bank_name: {
       type: 'string',
-      description: 'Branch of the bank where the account is held',
+      description: 'Name of the bank issuing the card',
     },
-    ownerName: {
+    expiry_date: {
       type: 'string',
-      description: 'Name of the account owner',
-    },
-    availableBalance: {
-      type: 'string',
-      description: 'Current available balance in the account',
-    },
-    currency: {
-      type: 'string',
-      description: 'Currency type of the account balance (e.g., USD, EUR)',
-    },
-    duedate: {
-      type: 'string',
-      description: 'Due date for any outstanding payments (format: YYYY-MM-DD)',
+      description: 'Card expiry date (format: MM/YY)',
     },
     country: {
       type: 'string',
-      description: 'Country where the bank account is registered',
+      description: 'Country where the card is registered',
     },
-    APR: {
+    branch: {
       type: 'string',
-      description: 'Annual Percentage Rate (APR) for the account',
+      description: 'Bank branch',
+    },
+    available_balance: {
+      type: 'string',
+      description: 'Available balance on the card',
+    },
+    upload_credit_card: {
+      type: 'string',
+      description: 'Path to uploaded credit card image',
+      nullable: true,
     },
     updatedBy: {
       type: 'string',

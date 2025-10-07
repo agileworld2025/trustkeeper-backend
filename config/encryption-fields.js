@@ -12,18 +12,25 @@ module.exports = {
 
   bank: [
     'account_number',
+    'account_holder',
     'ifsc_code',
-    'branch_name',
-    'account_holder_name',
-    'password',
-    'pin',
+    'branch',
+    'phone_number',
+    'bank_name',
+    'country',
+    'currency',
+    'document_path',
   ],
 
   credit_card: [
     'card_number',
-    'cvv',
-    'pin',
     'card_holder_name',
+    'bank_name',
+    'expiry_date',
+    'country',
+    'branch',
+    'available_balance',
+    'upload_credit_card',
   ],
 
   email_account: [
@@ -60,10 +67,10 @@ module.exports = {
   ],
 
   'fixed-deposit': [
-    'account_number',
-    'bank_name',
-    'branch_name',
-    'deposit_number',
+    // Encrypt actual columns present in fixed_deposits model
+    'fd_number',
+    'institution_details',
+    'nominee_information',
   ],
 
   insurance: [

@@ -3,7 +3,8 @@ const { transactions: TransactionsModel } = require('../database');
 const { camelToSnake } = require('../utils/helper');
 const { encryptObject, decryptArray } = require('../utils/encryption');
 const encryptionConfig = require('../config/encryption-fields');
-const encryptionFields = encryptionConfig['transactions'] || [];
+
+const encryptionFields = encryptionConfig.transactions || [];
 
 const save = async (data) => {
   try {
@@ -23,7 +24,7 @@ const save = async (data) => {
 
     return { doc: { publicId, message: 'transactions details successfully saved.' } };
   } catch (error) {
-    return { errors: [{ name: 'save', message: 'An error occurred while saving transactions data' }] };
+    return { errors: [ { name: 'save', message: 'An error occurred while saving transactions data' } ] };
   }
 };
 
@@ -45,7 +46,7 @@ const getAll = async (payload) => {
 
     return { count: decryptedDocs.length, doc: decryptedDocs };
   } catch (error) {
-    return { errors: [{ name: 'getAll', message: 'An error occurred while fetching transactions data' }] };
+    return { errors: [ { name: 'getAll', message: 'An error occurred while fetching transactions data' } ] };
   }
 };
 
@@ -61,17 +62,17 @@ const patch = async (payload) => {
       updated_by: updatedBy,
     };
 
-    const [updatedCount] = await TransactionsModel.update(updateData, {
+    const [ updatedCount ] = await TransactionsModel.update(updateData, {
       where: { public_id: publicId, is_deleted: false },
     });
 
     if (!updatedCount) {
-      return { errors: [{ name: 'patch', message: 'No transactions record found' }] };
+      return { errors: [ { name: 'patch', message: 'No transactions record found' } ] };
     }
 
     return { doc: { message: 'transactions details successfully updated.', publicId } };
   } catch (error) {
-    return { errors: [{ name: 'patch', message: 'An error occurred while updating transactions data' }] };
+    return { errors: [ { name: 'patch', message: 'An error occurred while updating transactions data' } ] };
   }
 };
 
@@ -79,18 +80,18 @@ const deleted = async (payload) => {
   try {
     const { publicId, updatedBy } = payload;
 
-    const [updatedCount] = await TransactionsModel.update(
+    const [ updatedCount ] = await TransactionsModel.update(
       { is_deleted: true, updated_by: updatedBy },
-      { where: { public_id: publicId, is_deleted: false } }
+      { where: { public_id: publicId, is_deleted: false } },
     );
 
     if (!updatedCount) {
-      return { errors: [{ name: 'deleted', message: 'No transactions record found' }] };
+      return { errors: [ { name: 'deleted', message: 'No transactions record found' } ] };
     }
 
     return { doc: { message: 'transactions details successfully deleted.' } };
   } catch (error) {
-    return { errors: [{ name: 'deleted', message: 'An error occurred while deleting transactions data' }] };
+    return { errors: [ { name: 'deleted', message: 'An error occurred while deleting transactions data' } ] };
   }
 };
 
