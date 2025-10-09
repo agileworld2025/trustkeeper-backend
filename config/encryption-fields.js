@@ -205,4 +205,18 @@ module.exports = {
     'document_path',
     'access_token',
   ],
+
+  'streaming-services': [
+    'netflix_username',
+    'netflix_password',
+    'amazon_prime_username',
+    'amazon_prime_password',
+    'streaming_provider_username',
+    'streaming_provider_password',
+    'streaming_provider_2_username',
+    'streaming_provider_2_password',
+    'streaming_provider_3_username',
+    'streaming_provider_3_password',
+    'country',
+  ],
 };
